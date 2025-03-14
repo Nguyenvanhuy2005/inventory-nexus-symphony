@@ -195,8 +195,17 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
       const errorText = await response.text().catch(() => "");
       console.error(`Custom API response error: ${response.status}`, errorText);
       
-      // Nếu là lỗi 404 Not Found, có thể REST API route chưa được đăng ký
+      // Kiểm tra cụ thể lỗi 404 và trả về thông báo rõ ràng hơn
       if (response.status === 404) {
+        // Kiểm tra nếu JSON có chứa thông báo rest_no_route
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.code === 'rest_no_route') {
+            throw new Error('Plugin HMM Custom API chưa được kích hoạt hoặc các endpoint chưa được đăng ký đúng.');
+          }
+        } catch (e) {
+          // Nếu không phải JSON hoặc không có code
+        }
         throw new Error('API endpoint không tồn tại. Vui lòng cài đặt plugin HMM Custom API.');
       }
       
@@ -210,14 +219,14 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
     console.error('Custom API error:', error);
     
     // Nếu vẫn còn lần thử lại và không phải lỗi 404 (vì 404 là lỗi route không tồn tại)
-    if (retryCount < 2 && !error.message?.includes('404')) {
+    if (retryCount < 2 && !error.message?.includes('404') && !error.message?.includes('kích hoạt')) {
       console.log(`Retrying Custom API request (${retryCount + 1}/2)...`);
       return fetchCustomAPI(endpoint, { ...options, retryCount: retryCount + 1 });
     }
     
     if (!options.suppressToast) {
-      if (error.message?.includes('plugin')) {
-        toast.error('API chưa sẵn sàng. Vui lòng cài đặt plugin HMM Custom API.');
+      if (error.message?.includes('plugin') || error.message?.includes('kích hoạt')) {
+        toast.error(error.message);
       } else {
         toast.error('Lỗi khi tải dữ liệu từ API tùy chỉnh');
       }
@@ -233,15 +242,37 @@ export async function checkAPIStatus() {
   try {
     // Thêm timestamp để tránh cache
     const timestamp = new Date().getTime();
-    const result = await fetchCustomAPI('/status', { 
-      suppressToast: true,
-      params: { '_': timestamp.toString() }
-    });
     
-    return {
-      isConnected: true,
-      status: result
-    };
+    try {
+      // Thử kiểm tra endpoint /status trước
+      const result = await fetchCustomAPI('/status', { 
+        suppressToast: true,
+        params: { '_': timestamp.toString() }
+      });
+      
+      return {
+        isConnected: true,
+        status: result
+      };
+    } catch (statusError) {
+      // Nếu endpoint /status không tồn tại, thử endpoint /suppliers
+      // vì đây là endpoint cơ bản luôn tồn tại trong plugin
+      console.log('Status endpoint not found, trying suppliers endpoint...');
+      const suppliers = await fetchCustomAPI('/suppliers', { 
+        suppressToast: true,
+        params: { '_': timestamp.toString() }
+      });
+      
+      // Nếu không có lỗi khi gọi /suppliers, xem như plugin đã được cài đặt
+      return {
+        isConnected: true,
+        status: {
+          plugin_version: 'Unknown version',
+          suppliers_count: suppliers.length,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
   } catch (error) {
     console.error('API Status check failed:', error);
     return {
@@ -350,7 +381,31 @@ export async function getWordPressUsers() {
   return await fetchWordPress('/users?per_page=100');
 }
 
-/**
- * API status endpoint function - this should be part of the WordPress plugin,
- * not the TypeScript file. Removing this part as it's PHP code.
- */
+// Lưu ý: Phần code dưới đây nên được triển khai trong plugin WordPress,
+// không phải trong file TypeScript này
+/* 
+API status endpoint function - PHP code for WordPress plugin:
+
+function hmm_api_status() {
+    global $wpdb;
+    
+    // Kiểm tra kết nối cơ sở dữ liệu
+    $db_status = !empty($wpdb->last_error) ? false : true;
+    
+    // Kiểm tra bảng nhà cung cấp
+    $suppliers_table = $wpdb->prefix . 'inventory_suppliers';
+    $suppliers_exists = $wpdb->get_var("SHOW TABLES LIKE '$suppliers_table'") == $suppliers_table;
+    
+    // Đếm số nhà cung cấp
+    $suppliers_count = $suppliers_exists ? $wpdb->get_var("SELECT COUNT(*) FROM $suppliers_table") : 0;
+    
+    return [
+        'status' => 'active',
+        'plugin_version' => '1.0.1',
+        'db_connection' => $db_status,
+        'suppliers_table_exists' => $suppliers_exists,
+        'suppliers_count' => (int)$suppliers_count,
+        'timestamp' => current_time('mysql')
+    ];
+}
+*/

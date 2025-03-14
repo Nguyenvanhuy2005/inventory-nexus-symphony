@@ -21,7 +21,10 @@ import {
   AlertTriangle,
   User,
   UserCog,
-  Lock
+  Lock,
+  FileCode,
+  ExternalLink,
+  Download
 } from "lucide-react";
 import { 
   Dialog, 
@@ -70,8 +73,10 @@ export default function Settings() {
   const [isTesting, setIsTesting] = useState(false);
   const [openPluginInfo, setOpenPluginInfo] = useState(false);
   const [openUserDialog, setOpenUserDialog] = useState(false);
+  const [openPluginCode, setOpenPluginCode] = useState(false);
   const [selectedUser, setSelectedUser] = useState<WPUser | null>(null);
   const [detailedStatus, setDetailedStatus] = useState<any>(null);
+  const [pluginInstallError, setPluginInstallError] = useState<string | null>(null);
 
   // Fetch WordPress users
   const { data: wpUsers = [], isLoading: isLoadingUsers } = useQuery({
@@ -130,6 +135,7 @@ export default function Settings() {
       wordpress: null,
       custom: null
     });
+    setPluginInstallError(null);
     
     try {
       // Test WooCommerce API
@@ -154,9 +160,16 @@ export default function Settings() {
       const statusResult = await checkAPIStatus();
       setApiStatus(prev => ({ ...prev, custom: statusResult.isConnected }));
       setDetailedStatus(statusResult.status);
+      
+      if (!statusResult.isConnected && statusResult.error) {
+        setPluginInstallError(statusResult.error);
+      }
     } catch (error) {
       console.error('Custom API test failed:', error);
       setApiStatus(prev => ({ ...prev, custom: false }));
+      if (error instanceof Error) {
+        setPluginInstallError(error.message);
+      }
     }
     
     setIsTesting(false);
@@ -173,6 +186,18 @@ export default function Settings() {
   const handleEditUser = (user: WPUser) => {
     setSelectedUser(user);
     setOpenUserDialog(true);
+  };
+  
+  // Tải file plugin
+  const handleDownloadPlugin = () => {
+    // Tạo một liên kết để tải xuống file plugin từ public folder
+    const link = document.createElement('a');
+    link.href = '/hmm-custom-api/hmm-custom-api.php';
+    link.download = 'hmm-custom-api.php';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Đang tải xuống file plugin");
   };
 
   return (
@@ -191,39 +216,77 @@ export default function Settings() {
           </TabsList>
           
           <TabsContent value="api" className="mt-4">
-            <div className="mb-4 p-4 border border-yellow-200 bg-yellow-50 rounded-md">
+            <div className={`mb-4 p-4 border rounded-md ${apiStatus.custom ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}`}>
               <div className="flex justify-between items-start">
-                <h3 className="font-medium text-yellow-800">Thông tin quan trọng về plugin HMM Custom API</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="p-1 h-auto" 
-                  onClick={() => setOpenPluginInfo(true)}
-                >
-                  <Info className="h-4 w-4 text-yellow-800" />
-                </Button>
+                <h3 className={`font-medium ${apiStatus.custom ? 'text-green-800' : 'text-yellow-800'}`}>
+                  Thông tin quan trọng về plugin HMM Custom API
+                </h3>
+                <div className="flex space-x-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-1 h-auto" 
+                    onClick={() => setOpenPluginCode(true)}
+                  >
+                    <FileCode className="h-4 w-4 text-yellow-800" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-1 h-auto" 
+                    onClick={() => setOpenPluginInfo(true)}
+                  >
+                    <Info className="h-4 w-4 text-yellow-800" />
+                  </Button>
+                </div>
               </div>
               <p className="text-yellow-700 mt-1">
                 Để sử dụng đầy đủ các tính năng của ứng dụng, vui lòng cài đặt plugin HMM Custom API vào website WordPress của bạn. 
                 Plugin này tạo các endpoint API tùy chỉnh để truy cập và quản lý dữ liệu.
               </p>
-              <p className="text-yellow-700 mt-2">
+              <p className={`mt-2 font-medium flex items-center ${apiStatus.custom ? 'text-green-600' : 'text-red-600'}`}>
                 Trạng thái hiện tại: {
                   apiStatus.custom === true ? (
                     <span className="text-green-600 font-medium inline-flex items-center">
-                      <CheckCheck className="h-4 w-4 mr-1" /> Đã kết nối thành công
+                      <CheckCheck className="h-4 w-4 ml-1 mr-1" /> Đã kết nối thành công
                     </span>
                   ) : apiStatus.custom === false ? (
                     <span className="text-red-600 font-medium inline-flex items-center">
-                      <X className="h-4 w-4 mr-1" /> Chưa kết nối được
+                      <X className="h-4 w-4 ml-1 mr-1" /> Chưa kết nối được
                     </span>
                   ) : (
                     <span className="text-gray-600 font-medium inline-flex items-center">
-                      <AlertTriangle className="h-4 w-4 mr-1" /> Chưa kiểm tra
+                      <AlertTriangle className="h-4 w-4 ml-1 mr-1" /> Chưa kiểm tra
                     </span>
                   )
                 }
               </p>
+              
+              {pluginInstallError && (
+                <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                  <div className="font-medium mb-1 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-1" /> Lỗi phát hiện:
+                  </div>
+                  <p>{pluginInstallError}</p>
+                  <div className="mt-2 text-sm">
+                    <strong>Khắc phục:</strong>
+                    <ul className="list-disc pl-5 mt-1 space-y-1">
+                      <li>Đảm bảo plugin đã được cài đặt vào thư mục <code className="bg-white px-1 py-0.5 rounded text-red-700">wp-content/plugins/hmm-custom-api</code></li>
+                      <li>Kích hoạt plugin trong trang quản trị WordPress</li>
+                      <li>Kiểm tra quyền truy cập tệp và thư mục trong WordPress</li>
+                      <li>Xem error logs của WordPress để phát hiện lỗi chi tiết</li>
+                    </ul>
+                  </div>
+                  <div className="mt-3 flex space-x-2">
+                    <Button size="sm" variant="outline" onClick={handleDownloadPlugin}>
+                      <Download className="mr-1 h-4 w-4" /> Tải plugin
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setOpenPluginInfo(true)}>
+                      <Info className="mr-1 h-4 w-4" /> Hướng dẫn cài đặt
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             
             <Form {...form}>
@@ -476,34 +539,240 @@ export default function Settings() {
             <div className="border rounded-md p-4 bg-gray-50">
               <h4 className="font-medium">1. Tải và cài đặt plugin</h4>
               <p className="text-sm mt-2">
-                File plugin đã được tạo tại: <code className="bg-gray-100 px-2 py-1 rounded">public/hmm-custom-api/hmm-custom-api.php</code>
+                Nhấn vào nút "Tải plugin" bên dưới để tải file plugin về máy của bạn
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="mt-2"
+                onClick={handleDownloadPlugin}
+              >
+                <Download className="mr-1 h-4 w-4" /> Tải plugin
+              </Button>
+            </div>
+            
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h4 className="font-medium">2. Tải plugin lên WordPress</h4>
+              <p className="text-sm mt-2">
+                <strong>Cách 1:</strong> Tạo thư mục <code className="bg-white px-1 py-0.5 rounded">hmm-custom-api</code> trong <code className="bg-white px-1 py-0.5 rounded">wp-content/plugins/</code> của website WordPress.
+                Sau đó tải file <code className="bg-white px-1 py-0.5 rounded">hmm-custom-api.php</code> vào thư mục đó.
               </p>
               <p className="text-sm mt-2">
-                Tải file này lên thư mục <code className="bg-gray-100 px-2 py-1 rounded">wp-content/plugins/hmm-custom-api</code> trên website WordPress của bạn
+                <strong>Cách 2:</strong> Đăng nhập vào trang quản trị WordPress, vào phần Plugins &gt; Thêm mới &gt; Tải plugin lên,
+                sau đó chọn file hmm-custom-api.php đã tải về.
               </p>
             </div>
             
             <div className="border rounded-md p-4 bg-gray-50">
-              <h4 className="font-medium">2. Kích hoạt plugin</h4>
+              <h4 className="font-medium">3. Kích hoạt plugin</h4>
               <p className="text-sm mt-2">
                 Đăng nhập vào trang quản trị WordPress, truy cập mục Plugins và kích hoạt plugin "HMM Custom API"
               </p>
+              <div className="mt-2">
+                <img 
+                  src="/lovable-uploads/634a5c0a-f20e-4df5-b916-9f87b3b4c1c6.png" 
+                  alt="Plugin trong WordPress" 
+                  className="border rounded max-w-full"
+                />
+              </div>
             </div>
             
             <div className="border rounded-md p-4 bg-gray-50">
-              <h4 className="font-medium">3. Kiểm tra kết nối</h4>
+              <h4 className="font-medium">4. Kiểm tra kết nối</h4>
               <p className="text-sm mt-2">
                 Sau khi kích hoạt, quay lại ứng dụng này và nhấn nút "Kiểm tra kết nối" để xác nhận plugin đã hoạt động
               </p>
             </div>
             
             <div className="border rounded-md p-4 bg-gray-50">
-              <h4 className="font-medium">4. Lưu cài đặt API</h4>
+              <h4 className="font-medium">5. Xử lý sự cố</h4>
               <p className="text-sm mt-2">
-                Đảm bảo bạn đã nhập đúng thông tin kết nối và nhấn "Lưu cài đặt" để áp dụng cấu hình
+                Nếu vẫn gặp lỗi sau khi kích hoạt plugin, hãy kiểm tra:
               </p>
+              <ul className="text-sm list-disc pl-5 mt-1">
+                <li>Plugin đã được kích hoạt thành công trong WordPress</li>
+                <li>Các tệp PHP không có lỗi cú pháp</li>
+                <li>Xem error log của WordPress</li>
+                <li>Cấu hình API trong ứng dụng này được nhập đúng</li>
+              </ul>
             </div>
           </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setOpenPluginInfo(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Plugin Code Dialog */}
+      <Dialog open={openPluginCode} onOpenChange={setOpenPluginCode}>
+        <DialogContent className="sm:max-w-[90vw] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Mã nguồn plugin HMM Custom API</DialogTitle>
+            <DialogDescription>
+              Đây là mã nguồn của plugin, bạn có thể kiểm tra hoặc chỉnh sửa nếu cần
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h4 className="font-medium">Tệp hmm-custom-api.php</h4>
+              <p className="text-sm mt-2">
+                Đây là tệp PHP chính của plugin. Bạn có thể tải xuống và cài đặt vào WordPress.
+              </p>
+              <div className="mt-2 flex justify-end space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleDownloadPlugin}
+                >
+                  <Download className="mr-1 h-4 w-4" /> Tải plugin
+                </Button>
+              </div>
+            </div>
+            
+            <div className="border rounded-md overflow-hidden">
+              <div className="bg-gray-100 px-4 py-2 font-mono text-sm flex justify-between items-center">
+                <span>hmm-custom-api.php</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={handleDownloadPlugin}
+                >
+                  <Download className="mr-1 h-3 w-3" /> Tải xuống
+                </Button>
+              </div>
+              <pre className="p-4 overflow-x-auto text-xs bg-white">
+                <code>{`<?php
+/**
+ * Plugin Name: HMM Custom API
+ * Plugin URI: https://hmm.vn
+ * Description: Plugin tạo REST API endpoints tùy chỉnh để truy cập dữ liệu cho ứng dụng React
+ * Version: 1.0.1
+ * Author: HMM Team
+ * Author URI: https://hmm.vn
+ * Text Domain: hmm-custom-api
+ */
+
+// Đảm bảo không truy cập trực tiếp
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Đăng ký REST API routes
+add_action('rest_api_init', 'hmm_register_custom_api_endpoints');
+
+function hmm_register_custom_api_endpoints() {
+    // Register status endpoint
+    register_rest_route('custom/v1', '/status', array(
+        'methods' => 'GET',
+        'callback' => 'hmm_api_status',
+        'permission_callback' => '__return_true',
+    ));
+
+    // Register damaged stock endpoints
+    register_rest_route('custom/v1', '/damaged-stock', array(
+        'methods' => 'GET',
+        'callback' => 'hmm_get_damaged_stock',
+        'permission_callback' => 'hmm_api_permissions_check',
+    ));
+    
+    // ... More endpoints registered here
+}
+
+// Thêm endpoint kiểm tra trạng thái API
+function hmm_api_status() {
+    global $wpdb;
+    
+    // Kiểm tra kết nối cơ sở dữ liệu
+    $db_status = !empty($wpdb->last_error) ? false : true;
+    
+    // Kiểm tra bảng nhà cung cấp
+    $suppliers_table = $wpdb->prefix . 'inventory_suppliers';
+    $suppliers_exists = $wpdb->get_var("SHOW TABLES LIKE '$suppliers_table'") == $suppliers_table;
+    
+    // Đếm số nhà cung cấp
+    $suppliers_count = $suppliers_exists ? $wpdb->get_var("SELECT COUNT(*) FROM $suppliers_table") : 0;
+    
+    // Liệt kê tất cả các bảng
+    $all_tables = $wpdb->get_results("SHOW TABLES", ARRAY_N);
+    $tables_list = [];
+    foreach($all_tables as $table) {
+        $tables_list[] = $table[0];
+    }
+    
+    return [
+        'status' => 'active',
+        'plugin_version' => '1.0.1',
+        'db_connection' => $db_status,
+        'suppliers_table_exists' => $suppliers_exists,
+        'suppliers_count' => (int)$suppliers_count,
+        'tables' => $tables_list,
+        'wp_prefix' => $wpdb->prefix,
+        'timestamp' => current_time('mysql')
+    ];
+}
+
+// Kiểm tra quyền truy cập API
+function hmm_api_permissions_check() {
+    // Luôn cho phép truy cập để test
+    return true;
+}
+
+// ... Các hàm khác của plugin
+
+// Activation hook để tạo các bảng cần thiết
+register_activation_hook(__FILE__, 'hmm_activate_plugin');
+
+function hmm_activate_plugin() {
+    // Log thông tin kích hoạt
+    error_log("HMM Custom API activated!");
+    
+    // Tạo các bảng trong database
+    hmm_create_damaged_stock_table();
+    hmm_create_goods_receipts_table();
+    hmm_create_returns_table();
+    hmm_create_suppliers_table();
+    hmm_create_payment_receipts_table();
+    
+    // Thêm dữ liệu mẫu nếu chưa có
+    hmm_add_sample_data();
+}
+
+// Tạo các bảng dữ liệu khi cần
+function hmm_create_suppliers_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'inventory_suppliers';
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE $table_name (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        name varchar(255) NOT NULL,
+        address text,
+        email varchar(100),
+        phone varchar(20),
+        initial_debt decimal(15,2) DEFAULT 0,
+        current_debt decimal(15,2) DEFAULT 0,
+        notes text,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+// ... Các hàm khác của plugin
+`}</code>
+              </pre>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setOpenPluginCode(false)}>Đóng</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
