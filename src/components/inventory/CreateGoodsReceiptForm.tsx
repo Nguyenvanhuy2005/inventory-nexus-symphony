@@ -220,7 +220,7 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Handle form submission
+  // Submit the data
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (items.length === 0) {
       toast.error("Vui lòng thêm ít nhất một sản phẩm");

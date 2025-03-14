@@ -1,219 +1,138 @@
-// Inventory models
-
-// Product model (for WooCommerce products)
-export interface Product {
-  id: number;
-  name: string;
-  slug?: string;
-  permalink?: string;
-  date_created?: string;
-  description?: string;
-  short_description?: string;
-  sku: string;
-  price: string;
-  regular_price?: string;
-  sale_price?: string;
-  stock_quantity?: number;
-  stock_status?: string;
-  categories?: Array<{id: number, name: string, slug: string}>;
-  images?: Array<{id: number, src: string, alt?: string}>;
-}
-
-// Supplier model
 export interface Supplier {
   id: number;
   name: string;
+  address: string;
   phone: string;
   email: string;
-  address: string;
-  initial_debt: number;
-  current_debt: number;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Customer model (extended from WooCommerce customers)
-export interface Customer {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  username?: string;
-  billing?: {
-    first_name: string;
-    last_name: string;
-    company?: string;
-    address_1: string;
-    address_2?: string;
-    city: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-    email: string;
-    phone: string;
-  };
-  shipping?: {
-    first_name: string;
-    last_name: string;
-    company?: string;
-    address_1: string;
-    address_2?: string;
-    city: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-  };
-  avatar_url?: string;
-  created_at: string;
-  // Extended custom fields
-  initial_debt?: number;
-  current_debt?: number;
-  notes?: string;
-}
-
-// Payment Receipt model
 export interface PaymentReceipt {
   id: number;
-  receipt_id?: string; 
-  date: string;
-  type: 'income' | 'expense'; // Thu/Chi
-  amount: number;
-  entity: 'customer' | 'supplier' | 'other';
+  receipt_id: string;
+  entity: string;
   entity_id: number;
   entity_name: string;
-  payment_method: 'cash' | 'bank_transfer' | 'credit_card' | 'other';
-  status: 'completed' | 'pending' | 'cancelled';
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  notes?: string;
-  description: string; // Adding the missing description property
-  attachment_url?: string;
-  reference?: string;
+  date: string;
+  amount: number;
+  payment_method: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Goods Receipt model
 export interface GoodsReceiptItem {
-  id?: number;
-  receipt_id?: number;
   product_id: number;
-  product_name: string;
+  variation_id: number;
+  product_name?: string;
+  name?: string;
+  sku: string;
   quantity: number;
   unit_price: number;
+  price: number;
   total_price: number;
-  // For frontend use only
-  name?: string;
-  sku?: string;
-  variation_id?: number;
-  price?: number;
-  subtotal?: number;
+  subtotal: number;
 }
 
 export interface GoodsReceipt {
-  id?: number;
+  id: number;
   receipt_id: string;
   supplier_id: number;
   supplier_name: string;
   date: string;
   total_amount: number;
   payment_amount: number;
-  payment_status: 'pending' | 'partial' | 'paid';
-  status: 'pending' | 'completed' | 'cancelled';
+  payment_method: string;
+  payment_status: string;
+  status: string;
   notes: string;
   items: GoodsReceiptItem[];
   created_at?: string;
   updated_at?: string;
-  // For frontend use only
-  payment_method?: string;
 }
 
-// Return model
 export interface ReturnItem {
-  id?: number;
-  return_id?: number;
   product_id: number;
-  product_name: string;
+  variation_id: number;
+  product_name?: string;
+  name?: string;
+  sku: string;
   quantity: number;
   unit_price: number;
+  price: number;
   total_price: number;
-  reason?: string;
-  // For frontend use only
-  name?: string;
-  sku?: string;
-  variation_id?: number;
-  price?: number;
-  subtotal?: number;
+  subtotal: number;
+  reason: string;
 }
 
 export interface Return {
-  id?: number;
+  id: number;
   return_id: string;
+  type: string;
   entity_id: number;
   entity_name: string;
-  type: 'customer' | 'supplier';
   date: string;
+  reason: string;
   total_amount: number;
-  refund_amount?: number;
-  reason?: string;
-  status: 'pending' | 'completed' | 'cancelled';
+  payment_amount: number;
+  payment_status: string;
+  status: string;
   notes: string;
   items: ReturnItem[];
   created_at?: string;
   updated_at?: string;
-  // For frontend use only
-  payment_amount?: number;
-  payment_status?: 'not_refunded' | 'refunded' | 'partial_refunded';
 }
 
-// Damaged Stock model
 export interface DamagedStock {
   id: number;
-  date: string;
   product_id: number;
   product_name: string;
   quantity: number;
   reason: string;
-  notes?: string;
-  created_at: string;
+  date: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Stock Adjustment model
 export interface StockAdjustment {
   id: number;
   product_id: number;
   product_name: string;
-  real_stock: number;
-  virtual_stock: number;
-  available_to_sell: number;
-  adjustment_date: string;
-  adjusted_by: string;
+  quantity_change: number;
+  new_quantity: number;
   reason: string;
-  notes?: string;
+  date: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Stock Adjustment Log model
-export interface StockAdjustmentLog {
-  id: number;
-  product_id: number;
-  prev_real_stock: number;
-  new_real_stock: number;
-  prev_virtual_stock: number;
-  new_virtual_stock: number;
-  adjustment_date: string;
-  adjusted_by: string;
-  reason: string;
-}
-
-// Customer Debt model
 export interface CustomerDebt {
   id: number;
   customer_id: number;
   customer_name: string;
-  initial_debt: number;
-  current_debt: number; // This will be used instead of 'amount'
-  last_updated: string; // This will be used instead of 'updated_at'
-  notes?: string;
-  customer_email?: string; // Add this property
-  customer_phone?: string; // Add this property
+  amount: number;
+  date: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Product interface
+export interface Product {
+  id: number;
+  name: string;
+  sku: string;
+  price: string;
+  regular_price: string;
+  sale_price: string;
+  stock_quantity?: number;
+  stock_status?: string;
+  categories?: Array<{id: number, name: string}>;
+  images?: Array<{id: number, src: string}>;
+  attributes?: any[];
+  variations?: number[];
 }

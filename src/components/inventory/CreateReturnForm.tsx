@@ -247,7 +247,7 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
         quantity: item.quantity,
         unit_price: item.unit_price || item.price || 0,
         total_price: (item.quantity * (item.unit_price || item.price || 0)),
-        reason: item.reason || "",
+        reason: item.reason || ""
       }));
 
       // Find entity name
