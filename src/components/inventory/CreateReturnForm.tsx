@@ -28,6 +28,7 @@ const formSchema = z.object({
   entity_id: z.string().min(1, "Vui lòng chọn đối tác"),
   date: z.string().min(1, "Vui lòng chọn ngày"),
   reason: z.string().min(1, "Vui lòng nhập lý do trả hàng"),
+  payment_amount: z.string().optional(),
   notes: z.string().optional(),
   items: z.array(
     z.object({
@@ -82,6 +83,7 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
       type: "customer",
       date: new Date().toISOString().split('T')[0],
       reason: "",
+      payment_amount: "0",
       items: [{ 
         product_id: 0, 
         name: "", 
@@ -99,6 +101,11 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
   
   // Calculate total amount
   const totalAmount = formValues.items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+
+  // Generate return_id
+  const generateReturnId = () => {
+    return `RT-${Math.floor(Date.now() / 1000)}`;
+  };
 
   // Handle product search
   const handleSearch = async (term: string) => {
@@ -214,13 +221,16 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
     
     // Prepare data for API
     const returnData = {
+      return_id: generateReturnId(),
       type: data.type,
       entity_id: parseInt(data.entity_id),
       entity_name: entityName,
       date: data.date,
       reason: data.reason,
       total_amount: totalAmount,
-      status: "completed",
+      payment_amount: parseFloat(data.payment_amount || "0"),
+      payment_status: "not_refunded" as const,
+      status: "completed" as const,
       notes: data.notes,
       items: data.items.map(item => ({
         product_id: item.product_id,

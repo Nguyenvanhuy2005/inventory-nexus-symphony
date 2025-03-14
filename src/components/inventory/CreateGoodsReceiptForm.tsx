@@ -76,6 +76,11 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
   // Calculate total amount
   const totalAmount = formValues.items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
 
+  // Generate receipt_id
+  const generateReceiptId = () => {
+    return `GR-${Math.floor(Date.now() / 1000)}`;
+  };
+
   // Handle product search
   const handleSearch = async (term: string) => {
     if (term.length < 2) return;
@@ -183,15 +188,16 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
     
     // Prepare data for API
     const goodsReceiptData = {
+      receipt_id: generateReceiptId(),
       supplier_id: parseInt(data.supplier_id),
       supplier_name: supplier?.name || "",
       date: data.date,
       total_amount: totalAmount,
       payment_amount: parseFloat(data.payment_amount || "0"),
       payment_method: data.payment_method,
-      payment_status: totalAmount <= parseFloat(data.payment_amount || "0") ? "paid" : 
-                     parseFloat(data.payment_amount || "0") > 0 ? "partial" : "pending",
-      status: "completed",
+      payment_status: totalAmount <= parseFloat(data.payment_amount || "0") ? "paid" as const : 
+                     parseFloat(data.payment_amount || "0") > 0 ? "partial" as const : "pending" as const,
+      status: "completed" as const,
       notes: data.notes,
       items: data.items.map(item => ({
         product_id: item.product_id,

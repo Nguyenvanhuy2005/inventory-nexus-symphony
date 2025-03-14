@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -57,8 +56,6 @@ export default function PaymentReceipts() {
         return <Badge variant="outline">Khách hàng</Badge>;
       case 'supplier':
         return <Badge variant="outline">Nhà cung cấp</Badge>;
-      case 'employee':
-        return <Badge variant="outline">Nhân viên</Badge>;
       case 'other':
         return <Badge variant="outline">Khác</Badge>;
       default:
@@ -86,14 +83,13 @@ export default function PaymentReceipts() {
       'Ngày': formatDate(item.date),
       'Loại': item.type === 'income' ? 'Thu' : 'Chi',
       'Đối tượng': item.entity === 'customer' ? 'Khách hàng' : 
-                 item.entity === 'supplier' ? 'Nhà cung cấp' : 
-                 item.entity === 'employee' ? 'Nhân viên' : 'Khác',
+                 item.entity === 'supplier' ? 'Nhà cung cấp' : 'Khác',
       'Tên': item.entity_name,
       'Số tiền': item.amount,
       'Phương thức': item.payment_method === 'cash' ? 'Tiền mặt' : 
                     item.payment_method === 'bank_transfer' ? 'Chuyển khoản' : 
                     item.payment_method === 'credit_card' ? 'Thẻ tín dụng' : 'Khác',
-      'Lý do': item.reason || '',
+      'Lý do': item.description || '',
       'Người tạo': item.created_by || '',
       'Ghi chú': item.notes || ''
     }));

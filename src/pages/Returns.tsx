@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -43,8 +42,6 @@ export default function Returns() {
     switch(status) {
       case 'completed':
         return <Badge className="bg-green-500">Hoàn thành</Badge>;
-      case 'processing':
-        return <Badge className="bg-blue-500">Đang xử lý</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-500">Chờ xử lý</Badge>;
       case 'cancelled':
@@ -88,10 +85,8 @@ export default function Returns() {
       'Tên đối tác': item.entity_name,
       'Tổng tiền': item.total_amount,
       'Trạng thái': item.status === 'completed' ? 'Hoàn thành' : 
-                   item.status === 'processing' ? 'Đang xử lý' : 
                    item.status === 'pending' ? 'Chờ xử lý' : 'Đã hủy',
       'Lý do': item.reason || '',
-      'Người tạo': item.created_by || '',
       'Ghi chú': item.notes || ''
     }));
     

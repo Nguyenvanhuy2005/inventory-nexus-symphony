@@ -1,4 +1,3 @@
-
 // Inventory models
 
 // Supplier model
@@ -57,20 +56,20 @@ export interface Customer {
 // Payment Receipt model
 export interface PaymentReceipt {
   id: number;
-  receipt_id?: string; // Added receipt_id property
+  receipt_id?: string; 
   date: string;
   type: 'income' | 'expense'; // Thu/Chi
   amount: number;
   entity: 'customer' | 'supplier' | 'other';
   entity_id: number;
   entity_name: string;
-  description: string;
   payment_method: 'cash' | 'bank_transfer' | 'credit_card' | 'other';
   status: 'completed' | 'pending' | 'cancelled';
   created_by: string;
   created_at: string;
   updated_at: string;
   notes?: string;
+  description: string; // Adding the missing description property
   attachment_url?: string;
   reference?: string;
 }
@@ -95,7 +94,7 @@ export interface GoodsReceipt {
   supplier_name: string;
   total_amount: number;
   payment_amount: number;
-  payment_status: 'paid' | 'partially_paid' | 'unpaid';
+  payment_status: 'paid' | 'partial' | 'pending';
   status: 'completed' | 'pending' | 'cancelled';
   notes?: string;
   created_at: string;
@@ -130,6 +129,7 @@ export interface Return {
   created_at: string;
   updated_at: string;
   items?: ReturnItem[];
+  reason?: string; // Adding reason field
 }
 
 // Damaged Stock model

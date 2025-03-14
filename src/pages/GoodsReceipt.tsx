@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -36,8 +35,6 @@ export default function GoodsReceipt() {
     switch(status) {
       case 'completed':
         return <Badge className="bg-green-500">Hoàn thành</Badge>;
-      case 'processing':
-        return <Badge className="bg-blue-500">Đang xử lý</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-500">Chờ xử lý</Badge>;
       case 'cancelled':
@@ -88,9 +85,7 @@ export default function GoodsReceipt() {
       'Trạng thái thanh toán': receipt.payment_status === 'paid' ? 'Đã thanh toán' : 
                               receipt.payment_status === 'partial' ? 'Một phần' : 'Chờ thanh toán',
       'Trạng thái': receipt.status === 'completed' ? 'Hoàn thành' : 
-                   receipt.status === 'processing' ? 'Đang xử lý' : 
                    receipt.status === 'pending' ? 'Chờ xử lý' : 'Đã hủy',
-      'Người tạo': receipt.created_by || '',
       'Ghi chú': receipt.notes || ''
     }));
     

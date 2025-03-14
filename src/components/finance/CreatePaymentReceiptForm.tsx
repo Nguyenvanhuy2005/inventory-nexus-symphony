@@ -21,7 +21,7 @@ const formSchema = z.object({
   type: z.enum(["income", "expense"], {
     required_error: "Vui lòng chọn loại phiếu thu chi",
   }),
-  entity: z.enum(["customer", "supplier", "employee", "other"], {
+  entity: z.enum(["customer", "supplier", "other"], {
     required_error: "Vui lòng chọn đối tượng",
   }),
   entity_id: z.string().min(1, "Vui lòng chọn đối tượng"),
@@ -29,7 +29,7 @@ const formSchema = z.object({
   date: z.string().min(1, "Vui lòng chọn ngày"),
   amount: z.string().min(1, "Vui lòng nhập số tiền"),
   payment_method: z.string().min(1, "Vui lòng chọn phương thức thanh toán"),
-  reason: z.string().min(1, "Vui lòng nhập lý do"),
+  description: z.string().min(1, "Vui lòng nhập lý do"),
   notes: z.string().optional(),
 });
 
@@ -73,7 +73,7 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
       date: new Date().toISOString().split('T')[0],
       amount: "",
       payment_method: "cash",
-      reason: "",
+      description: "",
       notes: ""
     }
   });
@@ -94,7 +94,7 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
       if (supplier) {
         form.setValue("entity_name", supplier.name);
       }
-    } else if (formEntity === "other" || formEntity === "employee") {
+    } else if (formEntity === "other") {
       form.setValue("entity_name", "");
     }
   }, [formEntity, formEntityId, customers, suppliers, form]);
@@ -110,7 +110,9 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         date: data.date,
         amount: parseFloat(data.amount),
         payment_method: data.payment_method,
-        reason: data.reason,
+        description: data.description,
+        status: "completed" as const,
+        created_by: "Admin", // Default created by
         notes: data.notes
       };
       
@@ -172,7 +174,6 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
                 <SelectContent>
                   <SelectItem value="customer">Khách hàng</SelectItem>
                   <SelectItem value="supplier">Nhà cung cấp</SelectItem>
-                  <SelectItem value="employee">Nhân viên</SelectItem>
                   <SelectItem value="other">Khác</SelectItem>
                 </SelectContent>
               </Select>
@@ -245,15 +246,15 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
           />
         )}
         
-        {(formEntity === "employee" || formEntity === "other") && (
+        {formEntity === "other" && (
           <FormField
             control={form.control}
             name="entity_name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Tên {formEntity === "employee" ? "nhân viên" : "đối tượng"}</FormLabel>
+                <FormLabel>Tên đối tượng</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder={`Nhập tên ${formEntity === "employee" ? "nhân viên" : "đối tượng"}`} />
+                  <Input {...field} placeholder="Nhập tên đối tượng" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -323,7 +324,7 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         
         <FormField
           control={form.control}
-          name="reason"
+          name="description"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Lý do</FormLabel>
