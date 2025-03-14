@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -92,6 +93,11 @@ export default function GoodsReceipt() {
     // Export to CSV
     exportToCSV('phieu-nhap-hang', reportData);
   };
+
+  // Handle after successful creation
+  const handleCreateSuccess = () => {
+    setOpenDialog(false);
+  };
   
   return (
     <div className="space-y-6">
@@ -131,7 +137,7 @@ export default function GoodsReceipt() {
                     Nhập thông tin phiếu nhập hàng từ nhà cung cấp
                   </DialogDescription>
                 </DialogHeader>
-                <CreateGoodsReceiptForm onSuccess={() => setOpenDialog(false)} />
+                <CreateGoodsReceiptForm onSuccess={handleCreateSuccess} />
               </DialogContent>
             </Dialog>
           </div>

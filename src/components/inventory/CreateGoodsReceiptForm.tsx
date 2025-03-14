@@ -1,3 +1,4 @@
+
 // Import necessary libraries and components
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -51,7 +52,8 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Product, Supplier, GoodsReceipt, GoodsReceiptItem } from "@/types/models";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCustomAPI, fetchWooCommerce } from "@/lib/api-utils";
+import { fetchCustomAPI } from "@/lib/api-utils";
+import { getAllProducts } from "@/lib/woocommerce";
 
 // Define the form schema
 const formSchema = z.object({
@@ -135,12 +137,8 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
 
     setIsSearching(true);
     try {
-      const results = await fetchWooCommerce("/products", {
-        params: {
-          search: searchTerm,
-          per_page: "10",
-        },
-      });
+      const results = await getAllProducts({ search: searchTerm, per_page: "10" });
+      console.log("Search results:", results);
       setSearchResults(results);
     } catch (error) {
       console.error("Error searching products:", error);
@@ -174,12 +172,12 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
           variation_id: 0,
           product_name: product.name,
           name: product.name,
-          sku: product.sku,
+          sku: product.sku || "",
           quantity: 1,
-          unit_price: parseFloat(product.price),
-          price: parseFloat(product.price),
-          total_price: parseFloat(product.price),
-          subtotal: parseFloat(product.price),
+          unit_price: parseFloat(product.price || "0"),
+          price: parseFloat(product.price || "0"),
+          total_price: parseFloat(product.price || "0"),
+          subtotal: parseFloat(product.price || "0"),
         },
       ]);
     }
@@ -198,6 +196,8 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
     updatedItems[index] = {
       ...updatedItems[index],
       quantity,
+      total_price: quantity * updatedItems[index].unit_price,
+      subtotal: quantity * updatedItems[index].unit_price,
     };
     setItems(updatedItems);
   };
@@ -211,6 +211,8 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
       ...updatedItems[index],
       unit_price: price,
       price: price,
+      total_price: updatedItems[index].quantity * price,
+      subtotal: updatedItems[index].quantity * price,
     };
     setItems(updatedItems);
   };
@@ -232,10 +234,14 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
       // Prepare items data for submission
       const itemsData = items.map((item) => ({
         product_id: item.product_id,
+        variation_id: item.variation_id,
         product_name: item.product_name || item.name || "",
+        sku: item.sku,
         quantity: item.quantity,
         unit_price: item.unit_price || item.price || 0,
-        total_price: (item.quantity * (item.unit_price || item.price || 0))
+        price: item.price || 0,
+        total_price: item.total_price,
+        subtotal: item.subtotal
       }));
 
       // Find supplier name
@@ -377,6 +383,12 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearch();
+                      }
+                    }}
                   />
                   <Button
                     type="button"
@@ -408,7 +420,7 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
                             <TableCell>{product.name}</TableCell>
                             <TableCell>{product.sku}</TableCell>
                             <TableCell>
-                              {parseFloat(product.price).toLocaleString()} đ
+                              {parseFloat(product.price || "0").toLocaleString()} đ
                             </TableCell>
                             <TableCell>
                               <Button

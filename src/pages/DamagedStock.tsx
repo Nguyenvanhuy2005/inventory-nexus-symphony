@@ -18,7 +18,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useGetProducts } from "@/hooks/use-mock-data";
+import { useQuery } from "@tanstack/react-query";
+import { getAllProducts } from "@/lib/woocommerce";
 
 // Form schema for damaged stock report
 const damagedStockSchema = z.object({
@@ -37,8 +38,17 @@ export default function DamagedStock() {
   
   // Get damaged stock data
   const { data: damagedStockItems = [], isLoading, isError } = useGetDamagedStock();
-  const { data: products = [] } = useGetProducts();
   const createDamagedStock = useCreateDamagedStock();
+
+  // Fetch products data
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const data = await getAllProducts({ per_page: "100" });
+      console.log("Fetched products:", data);
+      return data;
+    }
+  });
   
   // Filter damaged stock items based on search term
   const filteredItems = damagedStockItems.filter(item => 
@@ -135,12 +145,22 @@ export default function DamagedStock() {
                                 <SelectValue placeholder="Chọn sản phẩm" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
-                              {products.map((product) => (
-                                <SelectItem key={product.id} value={product.id.toString()}>
-                                  {product.name}
-                                </SelectItem>
-                              ))}
+                            <SelectContent className="max-h-80">
+                              {isLoadingProducts ? (
+                                <div className="flex items-center justify-center p-4">
+                                  <p>Đang tải sản phẩm...</p>
+                                </div>
+                              ) : products.length > 0 ? (
+                                products.map((product) => (
+                                  <SelectItem key={product.id} value={product.id.toString()}>
+                                    {product.name} {product.sku ? `(${product.sku})` : ''}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="flex items-center justify-center p-4">
+                                  <p>Không có sản phẩm nào</p>
+                                </div>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

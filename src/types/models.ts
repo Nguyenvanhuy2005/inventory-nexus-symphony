@@ -1,3 +1,4 @@
+
 export interface Supplier {
   id: number;
   name: string;
@@ -5,6 +6,8 @@ export interface Supplier {
   phone: string;
   email: string;
   notes: string;
+  initial_debt?: number;
+  current_debt?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -19,6 +22,10 @@ export interface PaymentReceipt {
   amount: number;
   payment_method: string;
   notes: string;
+  type?: string;
+  description?: string;
+  created_by?: string;
+  attachment_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -135,4 +142,8 @@ export interface Product {
   images?: Array<{id: number, src: string}>;
   attributes?: any[];
   variations?: number[];
+  description?: string;
+  short_description?: string;
+  type?: string;
+  manage_stock?: boolean;
 }
