@@ -351,10 +351,6 @@ export async function getWordPressUsers() {
 }
 
 /**
- * Thêm endpoint status mới để kiểm tra kết nối
+ * API status endpoint function - this should be part of the WordPress plugin,
+ * not the TypeScript file. Removing this part as it's PHP code.
  */
-register_rest_route('custom/v1', '/status', array(
-    'methods' => 'GET',
-    'callback' => 'hmm_api_status',
-    'permission_callback' => '__return_true',
-));
