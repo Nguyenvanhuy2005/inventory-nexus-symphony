@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Plugin Name: HMM Custom API
@@ -118,6 +117,21 @@ function hmm_register_custom_api_endpoints() {
         'methods' => 'POST',
         'callback' => 'hmm_create_payment_receipt',
         'permission_callback' => 'hmm_api_permissions_check',
+    ));
+    
+    // Register attachments endpoints
+    register_rest_route('custom/v1', '/attachments', array(
+        'methods' => 'POST',
+        'callback' => 'hmm_upload_attachment',
+        'permission_callback' => function () {
+            return current_user_can('upload_files');
+        }
+    ));
+
+    register_rest_route('custom/v1', '/attachments/(?P<entity_type>[a-zA-Z0-9_-]+)/(?P<entity_id>\d+)', array(
+        'methods' => 'GET',
+        'callback' => 'hmm_get_attachments',
+        'permission_callback' => '__return_true',
     ));
 }
 
@@ -894,6 +908,7 @@ function hmm_activate_plugin() {
     hmm_create_returns_table();
     hmm_create_suppliers_table();
     hmm_create_payment_receipts_table();
+    hmm_create_attachments_table();
     
     // Thêm dữ liệu mẫu nếu chưa có
     hmm_add_sample_data();
@@ -934,3 +949,126 @@ function hmm_deactivate_plugin() {
     error_log("HMM Custom API deactivated!");
 }
 
+function hmm_upload_attachment($request) {
+    // Check if user has permissions
+    if (!current_user_can('upload_files')) {
+        return new WP_Error('permission_denied', 'Bạn không có quyền tải lên tập tin', ['status' => 403]);
+    }
+    
+    // Check if file was uploaded
+    if (empty($_FILES['file'])) {
+        return new WP_Error('no_file', 'Không có tập tin nào được tải lên', ['status' => 400]);
+    }
+    
+    // Upload the file using WordPress media handling
+    $upload = wp_handle_upload($_FILES['file'], ['test_form' => false]);
+    
+    if (isset($upload['error'])) {
+        return new WP_Error('upload_error', $upload['error'], ['status' => 400]);
+    }
+    
+    // Create attachment post for the uploaded file
+    $file_path = $upload['file'];
+    $file_name = basename($file_path);
+    $file_type = wp_check_filetype($file_name, null);
+    
+    $attachment = [
+        'post_mime_type' => $file_type['type'],
+        'post_title' => sanitize_file_name($file_name),
+        'post_content' => '',
+        'post_status' => 'inherit'
+    ];
+    
+    $attach_id = wp_insert_attachment($attachment, $file_path);
+    
+    if (is_wp_error($attach_id)) {
+        return $attach_id;
+    }
+    
+    // Generate metadata for the attachment
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    $attach_data = wp_generate_attachment_metadata($attach_id, $file_path);
+    wp_update_attachment_metadata($attach_id, $attach_data);
+    
+    // Save the association in custom table if entity info provided
+    $entity_type = isset($request['entity_type']) ? sanitize_text_field($request['entity_type']) : '';
+    $entity_id = isset($request['entity_id']) ? intval($request['entity_id']) : 0;
+    
+    if (!empty($entity_type)) {
+        // Create attachments table if it doesn't exist
+        hmm_create_attachments_table();
+        
+        global $wpdb;
+        $attachments_table = $wpdb->prefix . 'hmm_attachments';
+        
+        // Insert attachment association
+        $wpdb->insert(
+            $attachments_table,
+            [
+                'entity_type' => $entity_type,
+                'entity_id' => $entity_id,
+                'attachment_id' => $attach_id,
+                'attachment_url' => wp_get_attachment_url($attach_id),
+                'filename' => $file_name,
+                'mime_type' => $file_type['type'],
+                'created_at' => current_time('mysql')
+            ]
+        );
+    }
+    
+    // Return attachment details
+    return [
+        'id' => $attach_id,
+        'url' => wp_get_attachment_url($attach_id),
+        'file' => $file_name,
+        'type' => $file_type['type']
+    ];
+}
+
+function hmm_get_attachments($request) {
+    $entity_type = $request['entity_type'];
+    $entity_id = $request['entity_id'];
+    
+    // Create attachments table if it doesn't exist
+    hmm_create_attachments_table();
+    
+    global $wpdb;
+    $attachments_table = $wpdb->prefix . 'hmm_attachments';
+    
+    $attachments = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT * FROM $attachments_table WHERE entity_type = %s AND entity_id = %d ORDER BY created_at DESC",
+            $entity_type,
+            $entity_id
+        ),
+        ARRAY_A
+    );
+    
+    return $attachments;
+}
+
+function hmm_create_attachments_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_attachments';
+    
+    // Kiểm tra xem bảng đã tồn tại chưa
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        $sql = "CREATE TABLE $table_name (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            entity_type varchar(50) NOT NULL,
+            entity_id bigint(20) NOT NULL DEFAULT 0,
+            attachment_id bigint(20) NOT NULL,
+            attachment_url varchar(255) NOT NULL,
+            filename varchar(255) NOT NULL,
+            mime_type varchar(100) NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY entity_type_id (entity_type, entity_id)
+        ) $charset_collate;";
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+}
