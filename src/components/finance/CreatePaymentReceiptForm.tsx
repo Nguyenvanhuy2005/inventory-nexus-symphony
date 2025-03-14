@@ -15,6 +15,7 @@ import { useCreatePaymentReceipt } from "@/hooks/api-hooks";
 import { getAllCustomers } from "@/lib/woocommerce";
 import { Supplier } from "@/types/models";
 import { toast } from "sonner";
+import { Upload } from "lucide-react";
 
 // Form schema for payment receipt
 const formSchema = z.object({
@@ -28,9 +29,9 @@ const formSchema = z.object({
   entity_name: z.string().min(1, "Tên đối tượng không được để trống"),
   date: z.string().min(1, "Vui lòng chọn ngày"),
   amount: z.string().min(1, "Vui lòng nhập số tiền"),
-  payment_method: z.string().min(1, "Vui lòng chọn phương thức thanh toán"),
   description: z.string().min(1, "Vui lòng nhập lý do"),
   notes: z.string().optional(),
+  attachment: z.instanceof(File).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -43,6 +44,8 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
   const { data: suppliers = [] } = useGetSuppliers();
   const [customers, setCustomers] = useState<any[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const createMutation = useCreatePaymentReceipt();
 
   // Load customers
@@ -72,7 +75,6 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
       entity_name: "",
       date: new Date().toISOString().split('T')[0],
       amount: "",
-      payment_method: "cash",
       description: "",
       notes: ""
     }
@@ -99,9 +101,49 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
     }
   }, [formEntity, formEntityId, customers, suppliers, form]);
 
+  // Handle file change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      
+      // Create preview URL
+      const fileReader = new FileReader();
+      fileReader.onload = () => {
+        setPreviewUrl(fileReader.result as string);
+      };
+      fileReader.readAsDataURL(file);
+    }
+  };
+
   // Submit form
   const onSubmit = async (data: FormValues) => {
     try {
+      let attachmentUrl = "";
+      
+      // If file is selected, handle file upload first
+      if (selectedFile) {
+        // Create form data for file upload
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        
+        // This is a placeholder for the API call to upload the file
+        // Replace with actual implementation
+        try {
+          // Simulate file upload - in a real implementation, this would be an API call
+          // For example: const response = await uploadFile(formData);
+          // Then: attachmentUrl = response.url;
+          
+          // For now, we'll just set a placeholder URL
+          attachmentUrl = URL.createObjectURL(selectedFile);
+          console.log("File uploaded:", attachmentUrl);
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          toast.error("Không thể tải lên tập tin");
+          return;
+        }
+      }
+      
       const paymentReceiptData = {
         type: data.type,
         entity: data.entity,
@@ -109,11 +151,12 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         entity_name: data.entity_name,
         date: data.date,
         amount: parseFloat(data.amount),
-        payment_method: data.payment_method,
+        payment_method: "cash" as const, // Default to cash since we're removing the field
         description: data.description,
         status: "completed" as const,
         created_by: "Admin", // Default created by
-        notes: data.notes
+        notes: data.notes,
+        attachment_url: attachmentUrl || undefined
       };
       
       await createMutation.mutateAsync(paymentReceiptData);
@@ -300,30 +343,6 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         
         <FormField
           control={form.control}
-          name="payment_method"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phương thức thanh toán</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn phương thức thanh toán" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="cash">Tiền mặt</SelectItem>
-                  <SelectItem value="bank_transfer">Chuyển khoản</SelectItem>
-                  <SelectItem value="credit_card">Thẻ tín dụng</SelectItem>
-                  <SelectItem value="other">Khác</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
@@ -335,6 +354,66 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
             </FormItem>
           )}
         />
+        
+        {/* File upload field */}
+        <FormItem>
+          <FormLabel>Hình ảnh đính kèm</FormLabel>
+          <div className="flex flex-col space-y-2">
+            <div className="flex items-center justify-center w-full">
+              <label
+                htmlFor="file-upload"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <Upload className="h-6 w-6 text-gray-500 mb-2" />
+                  <p className="mb-2 text-sm text-gray-500">
+                    <span className="font-semibold">Nhấp để tải lên</span> hoặc kéo và thả
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    PNG, JPG, hoặc PDF (Tối đa 10MB)
+                  </p>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  accept="image/*,.pdf"
+                  onChange={handleFileChange}
+                />
+              </label>
+            </div>
+            
+            {previewUrl && (
+              <div className="mt-2 relative">
+                {selectedFile?.type.startsWith("image/") ? (
+                  <div className="relative h-40 w-full overflow-hidden rounded-md">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center p-2 border rounded-md">
+                    <p className="text-sm truncate">{selectedFile?.name}</p>
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute top-2 right-2"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setPreviewUrl(null);
+                  }}
+                >
+                  X
+                </Button>
+              </div>
+            )}
+          </div>
+        </FormItem>
         
         <FormField
           control={form.control}

@@ -1,19 +1,21 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, FileDown, AlertTriangle, Eye } from "lucide-react";
+import { Search, Plus, FileDown, AlertTriangle, Eye, Paperclip } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { useGetPaymentReceipts, useCreatePaymentReceipt } from "@/hooks/api-hooks";
+import { useGetPaymentReceipts, useGetPaymentReceipt } from "@/hooks/api-hooks";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { exportToCSV } from "@/lib/api-utils";
 import CreatePaymentReceiptForm from "@/components/finance/CreatePaymentReceiptForm";
 import { toast } from "sonner";
+import { PaymentReceipt } from "@/types/models";
 
 export default function PaymentReceipts() {
   const navigate = useNavigate();
@@ -24,6 +26,12 @@ export default function PaymentReceipts() {
   
   // Get payment receipts data
   const { data: paymentReceipts = [], isLoading, isError } = useGetPaymentReceipts();
+  
+  // Get selected receipt data
+  const { 
+    data: selectedReceipt, 
+    isLoading: isLoadingReceipt 
+  } = useGetPaymentReceipt(selectedReceiptId || 0);
   
   // Filter payment receipts based on search term and tab
   const filteredReceipts = paymentReceipts.filter(item => {
@@ -86,9 +94,6 @@ export default function PaymentReceipts() {
                  item.entity === 'supplier' ? 'Nhà cung cấp' : 'Khác',
       'Tên': item.entity_name,
       'Số tiền': item.amount,
-      'Phương thức': item.payment_method === 'cash' ? 'Tiền mặt' : 
-                    item.payment_method === 'bank_transfer' ? 'Chuyển khoản' : 
-                    item.payment_method === 'credit_card' ? 'Thẻ tín dụng' : 'Khác',
       'Lý do': item.description || '',
       'Người tạo': item.created_by || '',
       'Ghi chú': item.notes || ''
@@ -194,11 +199,85 @@ export default function PaymentReceipts() {
             <DialogHeader>
               <DialogTitle>Chi tiết phiếu thu chi</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            {isLoadingReceipt ? (
+              <div className="space-y-4">
+                <p className="text-center text-muted-foreground">
+                  Đang tải chi tiết phiếu thu chi...
+                </p>
+              </div>
+            ) : selectedReceipt ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Mã phiếu</p>
+                    <p>{selectedReceipt.receipt_id || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Ngày</p>
+                    <p>{formatDate(selectedReceipt.date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Loại phiếu</p>
+                    <p>{getTypeBadge(selectedReceipt.type)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Đối tượng</p>
+                    <p>{getEntityBadge(selectedReceipt.entity)} {selectedReceipt.entity_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Số tiền</p>
+                    <p className="font-medium">{formatCurrency(selectedReceipt.amount.toString())}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Người tạo</p>
+                    <p>{selectedReceipt.created_by}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Lý do</p>
+                  <p>{selectedReceipt.description}</p>
+                </div>
+                
+                {selectedReceipt.notes && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Ghi chú</p>
+                    <p>{selectedReceipt.notes}</p>
+                  </div>
+                )}
+                
+                {selectedReceipt.attachment_url && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Đính kèm</p>
+                    <div className="mt-2">
+                      {selectedReceipt.attachment_url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                        <img 
+                          src={selectedReceipt.attachment_url} 
+                          alt="Receipt attachment" 
+                          className="max-h-60 rounded-md object-contain"
+                        />
+                      ) : (
+                        <div className="flex items-center p-2 bg-gray-50 rounded-md">
+                          <Paperclip className="h-4 w-4 mr-2" />
+                          <a 
+                            href={selectedReceipt.attachment_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:underline"
+                          >
+                            Xem tập tin đính kèm
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
               <p className="text-center text-muted-foreground">
-                Đang tải chi tiết phiếu thu chi...
+                Không tìm thấy thông tin phiếu thu chi
               </p>
-            </div>
+            )}
             <DialogFooter>
               <Button onClick={() => setSelectedReceiptId(null)}>Đóng</Button>
             </DialogFooter>
@@ -211,7 +290,7 @@ export default function PaymentReceipts() {
 
 // Table component for Payment Receipts
 interface PaymentReceiptsTableProps {
-  receipts: any[];
+  receipts: PaymentReceipt[];
   isLoading: boolean;
   isError: boolean;
   getTypeBadge: (type: string) => JSX.Element;
@@ -276,7 +355,7 @@ function PaymentReceiptsTable({
             <TableHead>Đối tượng</TableHead>
             <TableHead>Tên</TableHead>
             <TableHead>Số tiền</TableHead>
-            <TableHead>Phương thức</TableHead>
+            <TableHead>Đính kèm</TableHead>
             <TableHead className="text-right">Thao tác</TableHead>
           </TableRow>
         </TableHeader>
@@ -290,9 +369,12 @@ function PaymentReceiptsTable({
               <TableCell>{item.entity_name}</TableCell>
               <TableCell>{formatCurrency(item.amount.toString())}</TableCell>
               <TableCell>
-                {item.payment_method === 'cash' ? 'Tiền mặt' : 
-                 item.payment_method === 'bank_transfer' ? 'Chuyển khoản' : 
-                 item.payment_method === 'credit_card' ? 'Thẻ tín dụng' : item.payment_method}
+                {item.attachment_url ? (
+                  <Badge variant="outline">
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    Có
+                  </Badge>
+                ) : "-"}
               </TableCell>
               <TableCell className="text-right">
                 <Button 
