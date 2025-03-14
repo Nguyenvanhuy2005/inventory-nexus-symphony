@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,9 +9,23 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchWordPress, fetchCustomAPI, checkAPIStatus } from "@/lib/api-utils";
 import { toast } from "sonner";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { 
+  CheckCircle, 
+  AlertCircle, 
+  Info, 
+  X, 
+  CheckCheck, 
+  AlertTriangle 
+} from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 
 // Validation schema for API settings
 const apiSettingsSchema = z.object({
@@ -31,6 +45,8 @@ export default function Settings() {
     custom: null as boolean | null
   });
   const [isTesting, setIsTesting] = useState(false);
+  const [openPluginInfo, setOpenPluginInfo] = useState(false);
+  const [detailedStatus, setDetailedStatus] = useState<any>(null);
 
   // Setup form
   const form = useForm<ApiSettingsFormValues>({
@@ -43,6 +59,22 @@ export default function Settings() {
       application_password: "w6fl K60U uSgH qrs4 F6gh LDBl"
     }
   });
+
+  // Load saved settings on component mount
+  useEffect(() => {
+    try {
+      const savedSettings = localStorage.getItem('api_settings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        form.reset(settings);
+        
+        // Check API status
+        testConnections();
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  }, []);
   
   // Handle form submission
   const onSubmit = (data: ApiSettingsFormValues) => {
@@ -50,7 +82,12 @@ export default function Settings() {
     // Lưu các giá trị vào localStorage để có thể sử dụng lại
     localStorage.setItem('api_settings', JSON.stringify(data));
     toast.success("Cài đặt API đã được lưu");
-    // TODO: Implement saving settings to backend
+    
+    // Kiểm tra kết nối sau khi lưu
+    setTimeout(() => {
+      toast.info("Đang kiểm tra kết nối với cài đặt mới...");
+      testConnections();
+    }, 1000);
   };
   
   // Test API connections
@@ -81,9 +118,10 @@ export default function Settings() {
     }
     
     try {
-      // Test Custom API
-      await fetchCustomAPI('/damaged-stock', { suppressToast: true });
-      setApiStatus(prev => ({ ...prev, custom: true }));
+      // Test Custom API and get detailed status
+      const statusResult = await checkAPIStatus();
+      setApiStatus(prev => ({ ...prev, custom: statusResult.isConnected }));
+      setDetailedStatus(statusResult.status);
     } catch (error) {
       console.error('Custom API test failed:', error);
       setApiStatus(prev => ({ ...prev, custom: false }));
@@ -117,17 +155,37 @@ export default function Settings() {
           
           <TabsContent value="api" className="mt-4">
             <div className="mb-4 p-4 border border-yellow-200 bg-yellow-50 rounded-md">
-              <h3 className="font-medium text-yellow-800">Thông tin quan trọng về plugin HMM Custom API</h3>
+              <div className="flex justify-between items-start">
+                <h3 className="font-medium text-yellow-800">Thông tin quan trọng về plugin HMM Custom API</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="p-1 h-auto" 
+                  onClick={() => setOpenPluginInfo(true)}
+                >
+                  <Info className="h-4 w-4 text-yellow-800" />
+                </Button>
+              </div>
               <p className="text-yellow-700 mt-1">
                 Để sử dụng đầy đủ các tính năng của ứng dụng, vui lòng cài đặt plugin HMM Custom API vào website WordPress của bạn. 
                 Plugin này tạo các endpoint API tùy chỉnh để truy cập và quản lý dữ liệu.
               </p>
               <p className="text-yellow-700 mt-2">
-                File plugin đã được tạo tại: <code className="bg-yellow-100 px-2 py-1 rounded">public/hmm-custom-api/hmm-custom-api.php</code>
-              </p>
-              <p className="text-yellow-700 mt-2">
-                Tải file này lên thư mục <code className="bg-yellow-100 px-2 py-1 rounded">wp-content/plugins/</code> trên website WordPress của bạn, 
-                sau đó kích hoạt plugin trong trang quản trị WordPress.
+                Trạng thái hiện tại: {
+                  apiStatus.custom === true ? (
+                    <span className="text-green-600 font-medium inline-flex items-center">
+                      <CheckCheck className="h-4 w-4 mr-1" /> Đã kết nối thành công
+                    </span>
+                  ) : apiStatus.custom === false ? (
+                    <span className="text-red-600 font-medium inline-flex items-center">
+                      <X className="h-4 w-4 mr-1" /> Chưa kết nối được
+                    </span>
+                  ) : (
+                    <span className="text-gray-600 font-medium inline-flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-1" /> Chưa kiểm tra
+                    </span>
+                  )
+                }
               </p>
             </div>
             
@@ -211,7 +269,7 @@ export default function Settings() {
                   )}
                 />
                 
-                <div className="flex items-center mt-4 border-t pt-4">
+                <div className="flex flex-col mt-4 border-t pt-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Custom API: </span>
                     {getStatusIcon(apiStatus.custom)}
@@ -226,6 +284,14 @@ export default function Settings() {
                       </span>
                     )}
                   </div>
+                  
+                  {detailedStatus && (
+                    <div className="text-sm text-gray-600 ml-6">
+                      <p>Phiên bản: {detailedStatus.plugin_version}</p>
+                      <p>Nhà cung cấp trong DB: {detailedStatus.suppliers_count}</p>
+                      <p>Cập nhật lần cuối: {new Date(detailedStatus.timestamp).toLocaleString()}</p>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex justify-between">
@@ -277,6 +343,51 @@ export default function Settings() {
           </TabsContent>
         </Tabs>
       </Card>
+      
+      {/* Plugin Info Dialog */}
+      <Dialog open={openPluginInfo} onOpenChange={setOpenPluginInfo}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Hướng dẫn cài đặt plugin HMM Custom API</DialogTitle>
+            <DialogDescription>
+              Plugin này tạo các REST API endpoints để truy cập dữ liệu WordPress từ ứng dụng
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h4 className="font-medium">1. Tải và cài đặt plugin</h4>
+              <p className="text-sm mt-2">
+                File plugin đã được tạo tại: <code className="bg-gray-100 px-2 py-1 rounded">public/hmm-custom-api/hmm-custom-api.php</code>
+              </p>
+              <p className="text-sm mt-2">
+                Tải file này lên thư mục <code className="bg-gray-100 px-2 py-1 rounded">wp-content/plugins/hmm-custom-api</code> trên website WordPress của bạn
+              </p>
+            </div>
+            
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h4 className="font-medium">2. Kích hoạt plugin</h4>
+              <p className="text-sm mt-2">
+                Đăng nhập vào trang quản trị WordPress, truy cập mục Plugins và kích hoạt plugin "HMM Custom API"
+              </p>
+            </div>
+            
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h4 className="font-medium">3. Kiểm tra kết nối</h4>
+              <p className="text-sm mt-2">
+                Sau khi kích hoạt, quay lại ứng dụng này và nhấn nút "Kiểm tra kết nối" để xác nhận plugin đã hoạt động
+              </p>
+            </div>
+            
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h4 className="font-medium">4. Lưu cài đặt API</h4>
+              <p className="text-sm mt-2">
+                Đảm bảo bạn đã nhập đúng thông tin kết nối và nhấn "Lưu cài đặt" để áp dụng cấu hình
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

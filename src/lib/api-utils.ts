@@ -2,17 +2,40 @@
 import { toast } from 'sonner';
 
 // WooCommerce API credentials
-const WOO_API_URL = 'https://hmm.vn/wp-json/wc/v3';
-const CONSUMER_KEY = 'ck_bb8635bb0fd810ceb013f1a01423e03a7ddf955a';
-const CONSUMER_SECRET = 'cs_d2157fd9d4ef2ae3bcb1690ae4fd7c317c9f4460';
+let WOO_API_URL = 'https://hmm.vn/wp-json/wc/v3';
+let CONSUMER_KEY = 'ck_bb8635bb0fd810ceb013f1a01423e03a7ddf955a';
+let CONSUMER_SECRET = 'cs_d2157fd9d4ef2ae3bcb1690ae4fd7c317c9f4460';
 
 // WordPress API credentials
-const WP_API_URL = 'https://hmm.vn/wp-json/wp/v2';
-const WP_USERNAME = 'admin';
-const APPLICATION_PASSWORD = 'w6fl K60U uSgH qrs4 F6gh LDBl';
+let WP_API_URL = 'https://hmm.vn/wp-json/wp/v2';
+let WP_USERNAME = 'admin';
+let APPLICATION_PASSWORD = 'w6fl K60U uSgH qrs4 F6gh LDBl';
 
 // Custom API endpoint
-const CUSTOM_API_URL = 'https://hmm.vn/wp-json/custom/v1';
+let CUSTOM_API_URL = 'https://hmm.vn/wp-json/custom/v1';
+
+// Thử lấy cấu hình từ localStorage nếu có
+try {
+  const savedSettings = localStorage.getItem('api_settings');
+  if (savedSettings) {
+    const settings = JSON.parse(savedSettings);
+    if (settings.woocommerce_url) WOO_API_URL = settings.woocommerce_url;
+    if (settings.consumer_key) CONSUMER_KEY = settings.consumer_key;
+    if (settings.consumer_secret) CONSUMER_SECRET = settings.consumer_secret;
+    if (settings.wp_username) WP_USERNAME = settings.wp_username;
+    if (settings.application_password) APPLICATION_PASSWORD = settings.application_password;
+    
+    // Cập nhật URL API tùy chỉnh dựa trên domain của WooCommerce
+    if (settings.woocommerce_url) {
+      const domainMatch = settings.woocommerce_url.match(/(https?:\/\/[^\/]+)/);
+      if (domainMatch && domainMatch[1]) {
+        CUSTOM_API_URL = `${domainMatch[1]}/wp-json/custom/v1`;
+      }
+    }
+  }
+} catch (error) {
+  console.error('Error loading API settings from localStorage:', error);
+}
 
 // Interface for API options
 interface ApiOptions {
@@ -141,11 +164,10 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
     // Log the raw response for debugging
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      console.error(`Custom API response error: ${response.status} ${response.statusText}`, errorText);
+      console.error(`Custom API response error: ${response.status}`, errorText);
       
       // Nếu là lỗi 404 Not Found, có thể REST API route chưa được đăng ký
       if (response.status === 404) {
-        console.error('REST API route không tồn tại. Vui lòng cài đặt và kích hoạt plugin HMM Custom API.');
         throw new Error('API endpoint không tồn tại. Vui lòng cài đặt plugin HMM Custom API.');
       }
       
@@ -172,5 +194,24 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
       }
     }
     throw error;
+  }
+}
+
+/**
+ * Kiểm tra trạng thái API
+ */
+export async function checkAPIStatus() {
+  try {
+    const result = await fetchCustomAPI('/status', { suppressToast: true });
+    return {
+      isConnected: true,
+      status: result
+    };
+  } catch (error) {
+    console.error('API Status check failed:', error);
+    return {
+      isConnected: false,
+      error: error.message
+    };
   }
 }
