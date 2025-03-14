@@ -1,347 +1,399 @@
 
-import { useState, useEffect } from "react";
+// Import necessary libraries and components
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
+
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2 } from "lucide-react";
-import { useGetSuppliers } from "@/hooks/use-mock-data";
-import { useCreateReturn } from "@/hooks/api-hooks";
-import { searchProducts, normalizeProduct, getProductVariations, normalizeVariation } from "@/lib/woocommerce";
-import { Supplier } from "@/types/models";
-import { Product, Variation } from "@/lib/woocommerce";
-import { getAllCustomers } from "@/lib/woocommerce";
+import { cn } from "@/lib/utils";
+import { Product, Supplier, ReturnItem, Return } from "@/types/models";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCustomAPI, fetchWooCommerce } from "@/lib/api-utils";
 
-// Form schema for returns
+// Define the form schema
 const formSchema = z.object({
-  type: z.enum(["customer", "supplier"], {
-    required_error: "Vui lòng chọn loại phiếu trả hàng",
+  type: z.enum(["customer", "supplier"]),
+  entity_id: z.coerce.number({
+    required_error: "Vui lòng chọn đối tượng",
   }),
-  entity_id: z.string().min(1, "Vui lòng chọn đối tác"),
-  date: z.string().min(1, "Vui lòng chọn ngày"),
-  reason: z.string().min(1, "Vui lòng nhập lý do trả hàng"),
-  payment_amount: z.string().optional(),
+  date: z.date(),
+  reason: z.string().min(1, { message: "Vui lòng nhập lý do trả hàng" }),
   notes: z.string().optional(),
-  items: z.array(
-    z.object({
-      product_id: z.number().min(1, "Vui lòng chọn sản phẩm"),
-      variation_id: z.number().optional(),
-      name: z.string().min(1, "Tên sản phẩm không được để trống"),
-      sku: z.string().optional(),
-      quantity: z.number().min(1, "Số lượng tối thiểu là 1"),
-      price: z.number().min(0, "Giá không được âm"),
-      subtotal: z.number().min(0, "Thành tiền không được âm")
-    })
-  ).min(1, "Cần có ít nhất một sản phẩm")
 });
 
-type FormValues = z.infer<typeof formSchema>;
-
-interface CreateReturnFormProps {
-  onSuccess: () => void;
-}
-
-export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
-  const { data: suppliers = [] } = useGetSuppliers();
-  const [customers, setCustomers] = useState<any[]>([]);
+export default function CreateReturnForm() {
+  const [loading, setLoading] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedEntity, setSelectedEntity] = useState<Supplier | null>(null);
+  const [items, setItems] = useState<ReturnItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedVariations, setSelectedVariations] = useState<{[key: number]: Variation[]}>({});
-  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
-  const createMutation = useCreateReturn();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
-  // Load customers
-  useEffect(() => {
-    const loadCustomers = async () => {
-      setIsLoadingCustomers(true);
+  // Fetch suppliers data
+  const { data: suppliersData, isLoading: isLoadingSuppliers } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
       try {
-        const result = await getAllCustomers();
-        setCustomers(result);
+        const data = await fetchCustomAPI("/suppliers");
+        return data as Supplier[];
       } catch (error) {
-        console.error("Error loading customers:", error);
-      } finally {
-        setIsLoadingCustomers(false);
+        console.error("Error fetching suppliers:", error);
+        return [];
       }
-    };
-    
-    loadCustomers();
-  }, []);
-
-  // Initialize form
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      type: "customer",
-      date: new Date().toISOString().split('T')[0],
-      reason: "",
-      payment_amount: "0",
-      items: [{ 
-        product_id: 0, 
-        name: "", 
-        sku: "", 
-        quantity: 1, 
-        price: 0, 
-        subtotal: 0 
-      }]
     }
   });
 
-  // Watch form values for calculations
-  const formValues = form.watch();
-  const formType = form.watch("type");
-  
-  // Calculate total amount
-  const totalAmount = formValues.items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+  useEffect(() => {
+    if (suppliersData) {
+      setSuppliers(suppliersData);
+    }
+  }, [suppliersData]);
 
-  // Generate return_id
-  const generateReturnId = () => {
-    return `RT-${Math.floor(Date.now() / 1000)}`;
-  };
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      type: "supplier",
+      date: new Date(),
+      reason: "",
+      notes: "",
+    },
+  });
+
+  // Watch the type and entity_id fields
+  const type = form.watch("type");
+  const entity_id = form.watch("entity_id");
+
+  // Update selected entity when type and entity_id change
+  useEffect(() => {
+    if (type === "supplier" && entity_id) {
+      const supplier = suppliers.find((s) => s.id === entity_id);
+      setSelectedEntity(supplier || null);
+    } else {
+      setSelectedEntity(null);
+    }
+  }, [type, entity_id, suppliers]);
+
+  // Calculate total amount
+  const totalAmount = items.reduce(
+    (total, item) => total + item.quantity * (item.unit_price || item.price || 0),
+    0
+  );
 
   // Handle product search
-  const handleSearch = async (term: string) => {
-    if (term.length < 2) return;
-    
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+
     setIsSearching(true);
     try {
-      const results = await searchProducts(term);
-      const normalizedResults = results.map(normalizeProduct);
-      setSearchResults(normalizedResults);
+      const results = await fetchWooCommerce("/products", {
+        params: {
+          search: searchTerm,
+          per_page: "10",
+        },
+      });
+      setSearchResults(results);
     } catch (error) {
       console.error("Error searching products:", error);
+      toast.error("Lỗi khi tìm kiếm sản phẩm");
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm) {
-        handleSearch(searchTerm);
-      }
-    }, 500);
+  // Add product to items
+  const addProduct = (product: Product) => {
+    // Check if product already exists in items
+    const existingItemIndex = items.findIndex(
+      (item) => item.product_id === product.id
+    );
 
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Load variations when a variable product is selected
-  const loadVariations = async (productId: number) => {
-    try {
-      const variations = await getProductVariations(productId);
-      const normalizedVariations = variations.map(normalizeVariation);
-      setSelectedVariations(prev => ({
-        ...prev,
-        [productId]: normalizedVariations
-      }));
-    } catch (error) {
-      console.error("Error loading variations:", error);
-    }
-  };
-
-  // Add item to form
-  const addItem = () => {
-    const currentItems = form.getValues("items");
-    form.setValue("items", [
-      ...currentItems,
-      { product_id: 0, name: "", sku: "", quantity: 1, price: 0, subtotal: 0 }
-    ]);
-  };
-
-  // Remove item from form
-  const removeItem = (index: number) => {
-    const currentItems = form.getValues("items");
-    if (currentItems.length > 1) {
-      form.setValue("items", currentItems.filter((_, i) => i !== index));
-    }
-  };
-
-  // Handle product selection
-  const handleSelectProduct = (index: number, product: Product) => {
-    const items = form.getValues("items");
-    items[index] = {
-      ...items[index],
-      product_id: product.id,
-      name: product.name,
-      sku: product.sku || "",
-      price: parseFloat(product.price) || 0,
-      subtotal: (items[index].quantity || 1) * (parseFloat(product.price) || 0)
-    };
-    form.setValue("items", items);
-    
-    // Load variations if this is a variable product
-    if (product.type === "variable") {
-      loadVariations(product.id);
-    }
-  };
-
-  // Handle variation selection
-  const handleSelectVariation = (index: number, variation: Variation) => {
-    const items = form.getValues("items");
-    items[index] = {
-      ...items[index],
-      variation_id: variation.id,
-      name: `${items[index].name} - ${variation.attributes.map(attr => attr.option).join(", ")}`,
-      sku: variation.sku || items[index].sku,
-      price: parseFloat(variation.price) || items[index].price,
-      subtotal: (items[index].quantity || 1) * (parseFloat(variation.price) || items[index].price)
-    };
-    form.setValue("items", items);
-  };
-
-  // Update subtotal when quantity or price changes
-  const updateSubtotal = (index: number) => {
-    const items = form.getValues("items");
-    const quantity = items[index].quantity || 0;
-    const price = items[index].price || 0;
-    items[index].subtotal = quantity * price;
-    form.setValue("items", items);
-  };
-
-  // Submit form
-  const onSubmit = async (data: FormValues) => {
-    // Find entity name based on type and id
-    let entityName = "";
-    if (data.type === "supplier") {
-      const supplier = suppliers.find(s => s.id.toString() === data.entity_id);
-      entityName = supplier?.name || "";
+    if (existingItemIndex >= 0) {
+      // Update quantity if product already exists
+      const updatedItems = [...items];
+      updatedItems[existingItemIndex] = {
+        ...updatedItems[existingItemIndex],
+        quantity: updatedItems[existingItemIndex].quantity + 1,
+      };
+      setItems(updatedItems);
     } else {
-      const customer = customers.find(c => c.id.toString() === data.entity_id);
-      entityName = customer ? `${customer.first_name} ${customer.last_name}` : "";
+      // Add new product to items
+      setItems([
+        ...items,
+        {
+          product_id: product.id,
+          variation_id: 0,
+          product_name: product.name,
+          name: product.name,
+          sku: product.sku,
+          quantity: 1,
+          unit_price: parseFloat(product.price),
+          price: parseFloat(product.price),
+          total_price: parseFloat(product.price),
+          subtotal: parseFloat(product.price),
+        },
+      ]);
     }
-    
-    // Prepare data for API
-    const returnData = {
-      return_id: generateReturnId(),
-      type: data.type,
-      entity_id: parseInt(data.entity_id),
-      entity_name: entityName,
-      date: data.date,
-      reason: data.reason,
-      total_amount: totalAmount,
-      payment_amount: parseFloat(data.payment_amount || "0"),
-      payment_status: "not_refunded" as const,
-      status: "completed" as const,
-      notes: data.notes,
-      items: data.items.map(item => ({
-        product_id: item.product_id,
-        variation_id: item.variation_id || 0,
-        name: item.name,
-        sku: item.sku,
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.subtotal
-      }))
+
+    // Close the dialog
+    setIsDialogOpen(false);
+    setSearchTerm("");
+    setSearchResults([]);
+  };
+
+  // Update item quantity
+  const updateItemQuantity = (index: number, quantity: number) => {
+    if (quantity <= 0) return;
+
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      quantity,
     };
-    
+    setItems(updatedItems);
+  };
+
+  // Update item price
+  const updateItemPrice = (index: number, price: number) => {
+    if (price < 0) return;
+
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      unit_price: price,
+      price: price,
+    };
+    setItems(updatedItems);
+  };
+
+  // Update item reason
+  const updateItemReason = (index: number, reason: string) => {
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      reason,
+    };
+    setItems(updatedItems);
+  };
+
+  // Remove item
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  // Handle form submission
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (items.length === 0) {
+      toast.error("Vui lòng thêm ít nhất một sản phẩm");
+      return;
+    }
+
+    setLoading(true);
     try {
-      await createMutation.mutateAsync(returnData);
-      onSuccess();
+      // Prepare items data for submission
+      const itemsData = items.map((item) => ({
+        product_id: item.product_id,
+        product_name: item.product_name || item.name || "",
+        quantity: item.quantity,
+        unit_price: item.unit_price || item.price || 0,
+        reason: item.reason || "",
+      }));
+
+      // Find entity name
+      let entityName = "";
+      if (data.type === "supplier") {
+        entityName = suppliers.find((s) => s.id === data.entity_id)?.name || "";
+      } else {
+        // For customer returns, this would need to be fetched from customers
+        entityName = "Customer"; // Placeholder
+      }
+
+      // Prepare return data
+      const returnData: Omit<Return, 'id' | 'created_at' | 'updated_at'> = {
+        return_id: `RTN-${Date.now()}`,
+        type: data.type,
+        entity_id: data.entity_id,
+        entity_name: entityName,
+        date: format(data.date, "yyyy-MM-dd HH:mm:ss"),
+        reason: data.reason,
+        total_amount: totalAmount,
+        payment_amount: 0, // No payment by default
+        payment_status: "not_refunded",
+        status: "completed",
+        notes: data.notes || "",
+        items: itemsData,
+      };
+
+      // Submit the data
+      await fetchCustomAPI("/returns", {
+        method: "POST",
+        body: returnData,
+      });
+
+      toast.success("Đã tạo phiếu trả hàng thành công");
+      navigate("/returns");
     } catch (error) {
       console.error("Error creating return:", error);
+      toast.error("Lỗi khi tạo phiếu trả hàng");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Loại trả hàng</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  className="flex space-x-4"
-                  defaultValue={field.value}
-                  onValueChange={field.onChange}
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="customer" id="customer" />
-                    <label htmlFor="customer" className="text-sm font-medium">
-                      Khách hàng trả hàng
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="supplier" id="supplier" />
-                    <label htmlFor="supplier" className="text-sm font-medium">
-                      Trả hàng cho nhà cung cấp
-                    </label>
-                  </div>
-                </RadioGroup>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <FormField
             control={form.control}
-            name="entity_id"
+            name="type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{formType === "supplier" ? "Nhà cung cấp" : "Khách hàng"}</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormLabel>Loại phiếu trả</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder={formType === "supplier" ? "Chọn nhà cung cấp" : "Chọn khách hàng"} />
+                      <SelectValue placeholder="Chọn loại phiếu" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {formType === "supplier" ? (
-                      suppliers.map((supplier: Supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))
-                    ) : isLoadingCustomers ? (
-                      <SelectItem value="loading" disabled>
-                        Đang tải danh sách khách hàng...
-                      </SelectItem>
-                    ) : customers.length === 0 ? (
-                      <SelectItem value="empty" disabled>
-                        Không có khách hàng
-                      </SelectItem>
-                    ) : (
-                      customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id.toString()}>
-                          {customer.first_name} {customer.last_name}
-                        </SelectItem>
-                      ))
-                    )}
+                    <SelectItem value="supplier">Trả hàng cho NCC</SelectItem>
+                    <SelectItem value="customer">Khách trả hàng</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
+
+          {type === "supplier" && (
+            <FormField
+              control={form.control}
+              name="entity_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nhà cung cấp</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    value={field.value?.toString() || ""}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn nhà cung cấp" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {isLoadingSuppliers ? (
+                        <div className="flex items-center justify-center p-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="ml-2">Đang tải...</span>
+                        </div>
+                      ) : (
+                        suppliers.map((supplier) => (
+                          <SelectItem
+                            key={supplier.id}
+                            value={supplier.id.toString()}
+                          >
+                            {supplier.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           <FormField
             control={form.control}
             name="date"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Ngày trả hàng</FormLabel>
-                <FormControl>
-                  <Input type="date" {...field} />
-                </FormControl>
+              <FormItem className="flex flex-col">
+                <FormLabel>Ngày trả</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, "dd/MM/yyyy")
+                        ) : (
+                          <span>Chọn ngày</span>
+                        )}
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        
+
         <FormField
           control={form.control}
           name="reason"
@@ -349,184 +401,177 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
             <FormItem>
               <FormLabel>Lý do trả hàng</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="Nhập lý do trả hàng" />
+                <Input placeholder="Nhập lý do trả hàng" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        
-        <Separator />
-        
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Danh sách sản phẩm</h3>
-            <Button type="button" variant="outline" size="sm" onClick={addItem}>
-              <Plus className="h-4 w-4 mr-1" /> Thêm sản phẩm
-            </Button>
-          </div>
-          
-          {form.getValues("items").map((item, index) => (
-            <Card key={index} className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <FormLabel>Sản phẩm</FormLabel>
-                  <div className="relative">
-                    <Input
-                      placeholder="Tìm sản phẩm..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    {searchTerm.length > 1 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white shadow-lg rounded-md max-h-48 overflow-auto border">
-                        {isSearching ? (
-                          <div className="p-2 text-center">Đang tìm...</div>
-                        ) : searchResults.length === 0 ? (
-                          <div className="p-2 text-center">Không tìm thấy sản phẩm</div>
-                        ) : (
-                          searchResults.map(product => (
-                            <div
-                              key={product.id}
-                              className="p-2 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                handleSelectProduct(index, product);
-                                setSearchTerm("");
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                {product.images[0] && (
-                                  <img
-                                    src={product.images[0].src}
-                                    alt={product.name}
-                                    className="h-8 w-8 rounded object-cover"
-                                  />
-                                )}
-                                <div>
-                                  <div>{product.name}</div>
-                                  <div className="text-sm text-gray-500">
-                                    {product.sku ? `SKU: ${product.sku}` : ""} 
-                                    {product.type === "variable" ? " (Có biến thể)" : ""}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {item.product_id > 0 && (
-                    <div className="mt-2 text-sm">
-                      Đã chọn: <span className="font-medium">{item.name}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {item.product_id > 0 && selectedVariations[item.product_id] && (
-                  <div>
-                    <FormLabel>Biến thể</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const variation = selectedVariations[item.product_id].find(v => v.id === parseInt(value));
-                        if (variation) {
-                          handleSelectVariation(index, variation);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn biến thể" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedVariations[item.product_id].map(variation => (
-                          <SelectItem key={variation.id} value={variation.id.toString()}>
-                            {variation.attributes.map(attr => attr.option).join(", ")} - {variation.price}đ
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.quantity`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Số lượng</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="1"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(parseInt(e.target.value) || 1);
-                            updateSubtotal(index);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.price`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Giá</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(parseFloat(e.target.value) || 0);
-                            updateSubtotal(index);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name={`items.${index}.subtotal`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Thành tiền</FormLabel>
-                      <FormControl>
-                        <Input
-                          readOnly
-                          value={field.value.toLocaleString('vi-VN')}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              {form.getValues("items").length > 1 && (
-                <div className="flex justify-end mt-2">
+
+        <Card className="p-4">
+          <div className="flex justify-between mb-4">
+            <h3 className="text-lg font-medium">Sản phẩm</h3>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Thêm sản phẩm
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Tìm kiếm sản phẩm</DialogTitle>
+                </DialogHeader>
+                <div className="flex gap-2 mt-4">
+                  <Input
+                    placeholder="Nhập tên hoặc mã sản phẩm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="flex-1"
+                  />
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeItem(index)}
+                    onClick={handleSearch}
+                    disabled={isSearching}
                   >
-                    <Trash2 className="h-4 w-4 mr-1" /> Xóa
+                    {isSearching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    <span className="ml-2">Tìm</span>
                   </Button>
                 </div>
-              )}
-            </Card>
-          ))}
-        </div>
-        
+                <div className="mt-4 max-h-96 overflow-auto">
+                  {searchResults.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tên sản phẩm</TableHead>
+                          <TableHead>Mã</TableHead>
+                          <TableHead>Giá</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {searchResults.map((product) => (
+                          <TableRow key={product.id}>
+                            <TableCell>{product.name}</TableCell>
+                            <TableCell>{product.sku}</TableCell>
+                            <TableCell>
+                              {parseFloat(product.price).toLocaleString()} đ
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => addProduct(product)}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : searchTerm && !isSearching ? (
+                    <p className="text-center text-muted-foreground py-4">
+                      Không tìm thấy sản phẩm nào
+                    </p>
+                  ) : null}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {items.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tên sản phẩm</TableHead>
+                  <TableHead>Mã</TableHead>
+                  <TableHead>Số lượng</TableHead>
+                  <TableHead>Đơn giá</TableHead>
+                  <TableHead>Lý do</TableHead>
+                  <TableHead>Thành tiền</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{item.product_name || item.name}</TableCell>
+                    <TableCell>{item.sku}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateItemQuantity(index, parseInt(e.target.value))
+                        }
+                        className="w-20"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.unit_price || item.price || 0}
+                        onChange={(e) =>
+                          updateItemPrice(index, parseFloat(e.target.value))
+                        }
+                        className="w-28"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="text"
+                        value={item.reason || ""}
+                        onChange={(e) =>
+                          updateItemReason(index, e.target.value)
+                        }
+                        className="w-40"
+                        placeholder="Lý do trả"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {(
+                        item.quantity *
+                        (item.unit_price || item.price || 0)
+                      ).toLocaleString()}{" "}
+                      đ
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeItem(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={5} className="text-right font-medium">
+                    Tổng cộng:
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {totalAmount.toLocaleString()} đ
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Chưa có sản phẩm nào. Vui lòng thêm sản phẩm.
+            </div>
+          )}
+        </Card>
+
         <FormField
           control={form.control}
           name="notes"
@@ -534,24 +579,27 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
             <FormItem>
               <FormLabel>Ghi chú</FormLabel>
               <FormControl>
-                <Textarea {...field} />
+                <Textarea
+                  placeholder="Nhập ghi chú cho phiếu trả hàng"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        
-        <div className="flex justify-between items-center">
-          <div className="text-lg font-medium">
-            Tổng tiền: <span className="text-primary">{totalAmount.toLocaleString('vi-VN')}đ</span>
-          </div>
-        </div>
-        
-        <DialogFooter>
-          <Button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Đang lưu..." : "Lưu phiếu trả hàng"}
+
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            className="w-full md:w-auto"
+            disabled={loading || items.length === 0}
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Plus className="mr-2 h-4 w-4" />
+            Tạo phiếu trả hàng
           </Button>
-        </DialogFooter>
+        </div>
       </form>
     </Form>
   );

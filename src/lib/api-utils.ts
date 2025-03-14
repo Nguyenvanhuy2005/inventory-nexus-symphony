@@ -13,6 +13,9 @@ let APPLICATION_PASSWORD = 'w6fl K60U uSgH qrs4 F6gh LDBl';
 // Custom API endpoint
 let CUSTOM_API_URL = 'https://hmm.vn/wp-json/custom/v1';
 
+// Media API endpoint
+let MEDIA_API_URL = 'https://hmm.vn/wp-json/media/v1';
+
 // Thử lấy cấu hình từ localStorage nếu có
 try {
   const savedSettings = localStorage.getItem('api_settings');
@@ -29,6 +32,7 @@ try {
       const domainMatch = settings.woocommerce_url.match(/(https?:\/\/[^\/]+)/);
       if (domainMatch && domainMatch[1]) {
         CUSTOM_API_URL = `${domainMatch[1]}/wp-json/custom/v1`;
+        MEDIA_API_URL = `${domainMatch[1]}/wp-json/media/v1`;
       }
     }
   }
@@ -235,6 +239,82 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
 }
 
 /**
+ * Fetch data from media API
+ */
+export async function fetchMediaAPI(endpoint: string, options: ApiOptions = {}) {
+  const retryCount = options.retryCount || 0;
+  
+  try {
+    let url = `${MEDIA_API_URL}${endpoint}`;
+    const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
+    
+    // Thêm các tham số vào URL nếu có
+    if (options.params) {
+      const params = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        params.append(key, value);
+      });
+      url = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
+    }
+    
+    console.log(`Fetching Media API: ${endpoint}`, url);
+    
+    const response = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${credentials}`,
+        ...options.headers,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    // Log the raw response for debugging
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error(`Media API response error: ${response.status}`, errorText);
+      
+      // Kiểm tra cụ thể lỗi 404 và trả về thông báo rõ ràng hơn
+      if (response.status === 404) {
+        // Kiểm tra nếu JSON có chứa thông báo rest_no_route
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.code === 'rest_no_route') {
+            throw new Error('Plugin HMM Media API chưa được kích hoạt hoặc các endpoint chưa được đăng ký đúng.');
+          }
+        } catch (e) {
+          // Nếu không phải JSON hoặc không có code
+        }
+        throw new Error('API endpoint không tồn tại. Vui lòng cài đặt plugin HMM Media API.');
+      }
+      
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`Media API response data:`, data);
+    return data;
+  } catch (error) {
+    console.error('Media API error:', error);
+    
+    // Nếu vẫn còn lần thử lại và không phải lỗi 404 (vì 404 là lỗi route không tồn tại)
+    if (retryCount < 2 && !error.message?.includes('404') && !error.message?.includes('kích hoạt')) {
+      console.log(`Retrying Media API request (${retryCount + 1}/2)...`);
+      return fetchMediaAPI(endpoint, { ...options, retryCount: retryCount + 1 });
+    }
+    
+    if (!options.suppressToast) {
+      if (error.message?.includes('plugin') || error.message?.includes('kích hoạt')) {
+        toast.error(error.message);
+      } else {
+        toast.error('Lỗi khi tải dữ liệu từ Media API');
+      }
+    }
+    throw error;
+  }
+}
+
+/**
  * Kiểm tra trạng thái API
  */
 export async function checkAPIStatus() {
@@ -292,7 +372,8 @@ export async function uploadMedia(file: File) {
     
     const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
     
-    const response = await fetch(`${WP_API_URL}/media`, {
+    // Sử dụng Media API endpoint mới
+    const response = await fetch(`${MEDIA_API_URL}/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${credentials}`,
@@ -303,6 +384,12 @@ export async function uploadMedia(file: File) {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       console.error(`Upload media error: ${response.status}`, errorText);
+      
+      if (response.status === 404) {
+        toast.error('Plugin HMM Media API chưa được cài đặt hoặc kích hoạt.');
+        throw new Error('Plugin HMM Media API chưa được cài đặt hoặc kích hoạt.');
+      }
+      
       throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
     }
     
@@ -311,9 +398,9 @@ export async function uploadMedia(file: File) {
     
     // Trả về URL của tập tin đã tải lên
     return {
-      url: data.source_url,
+      url: data.url,
       id: data.id,
-      filename: data.title.rendered
+      filename: data.file
     };
   } catch (error) {
     console.error('Error uploading media:', error);
@@ -323,7 +410,7 @@ export async function uploadMedia(file: File) {
 }
 
 /**
- * Upload file attachment cho các phiếu và lưu trữ trong Custom API
+ * Upload file attachment cho các phiếu và lưu trữ trong Media API
  */
 export async function uploadAttachment(file: File, entityType: string, entityId?: number) {
   try {
@@ -335,7 +422,7 @@ export async function uploadAttachment(file: File, entityType: string, entityId?
     // 2. If we have an entityType and entityId, associate the file with the entity
     if (entityType && entityId) {
       // Gọi API tùy chỉnh để liên kết tập tin với thực thể
-      await fetchCustomAPI('/attachments', {
+      await fetchMediaAPI('/attachments', {
         method: 'POST',
         body: {
           entity_type: entityType,
@@ -353,6 +440,18 @@ export async function uploadAttachment(file: File, entityType: string, entityId?
     console.error('Error uploading attachment:', error);
     toast.error('Lỗi khi tải lên tập tin đính kèm');
     throw error;
+  }
+}
+
+/**
+ * Lấy danh sách file đính kèm của một đối tượng
+ */
+export async function getAttachments(entityType: string, entityId: number) {
+  try {
+    return await fetchMediaAPI(`/attachments/${entityType}/${entityId}`);
+  } catch (error) {
+    console.error('Error fetching attachments:', error);
+    return [];
   }
 }
 

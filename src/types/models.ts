@@ -76,60 +76,75 @@ export interface PaymentReceipt {
 
 // Goods Receipt model
 export interface GoodsReceiptItem {
-  id: number;
-  receipt_id: number;
+  id?: number;
+  receipt_id?: number;
   product_id: number;
   product_name: string;
   quantity: number;
   unit_price: number;
-  total: number;
-  created_at: string;
+  total_price: number;
+  // For frontend use only
+  name?: string;
+  sku?: string;
+  variation_id?: number;
+  price?: number;
+  subtotal?: number;
 }
 
 export interface GoodsReceipt {
-  id: number;
+  id?: number;
   receipt_id: string;
-  date: string;
   supplier_id: number;
   supplier_name: string;
+  date: string;
   total_amount: number;
   payment_amount: number;
-  payment_status: 'paid' | 'partial' | 'pending';
-  status: 'completed' | 'pending' | 'cancelled';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  items?: GoodsReceiptItem[];
+  payment_status: 'pending' | 'partial' | 'paid';
+  status: 'pending' | 'completed' | 'cancelled';
+  notes: string;
+  items: GoodsReceiptItem[];
+  created_at?: string;
+  updated_at?: string;
+  // For frontend use only
+  payment_method?: string;
 }
 
 // Return model
 export interface ReturnItem {
-  id: number;
-  return_id: number;
+  id?: number;
+  return_id?: number;
   product_id: number;
   product_name: string;
   quantity: number;
   unit_price: number;
-  total: number;
-  reason: string;
+  total_price: number;
+  reason?: string;
+  // For frontend use only
+  name?: string;
+  sku?: string;
+  variation_id?: number;
+  price?: number;
+  subtotal?: number;
 }
 
 export interface Return {
-  id: number;
+  id?: number;
   return_id: string;
-  date: string;
-  type: 'customer' | 'supplier';
   entity_id: number;
   entity_name: string;
+  type: 'customer' | 'supplier';
+  date: string;
   total_amount: number;
-  payment_amount: number;
-  payment_status: 'refunded' | 'partially_refunded' | 'not_refunded';
-  status: 'completed' | 'pending' | 'cancelled';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  items?: ReturnItem[];
-  reason?: string; // Adding reason field
+  refund_amount?: number;
+  reason?: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  notes: string;
+  items: ReturnItem[];
+  created_at?: string;
+  updated_at?: string;
+  // For frontend use only
+  payment_amount?: number;
+  payment_status?: 'not_refunded' | 'refunded' | 'partial_refunded';
 }
 
 // Damaged Stock model
