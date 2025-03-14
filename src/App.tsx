@@ -37,7 +37,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/inventory" element={<Inventory />} />
-            {/* Chuyển hướng từ /products sang /inventory theo yêu cầu */}
             <Route path="/products" element={<Navigate to="/inventory" replace />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/customers" element={<Customers />} />
