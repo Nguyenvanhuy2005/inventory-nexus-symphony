@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -68,8 +67,11 @@ export default function DamagedStock() {
     }
     
     const newDamagedStock = {
-      ...data,
+      product_id: data.product_id,
       product_name: selectedProduct.name,
+      quantity: data.quantity,
+      reason: data.reason,
+      notes: data.notes || "",
       date: new Date().toISOString()
     };
     
