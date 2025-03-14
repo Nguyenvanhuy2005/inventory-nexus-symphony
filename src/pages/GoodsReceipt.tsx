@@ -11,10 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useGetGoodsReceipts, useCreateGoodsReceipt } from "@/hooks/api-hooks";
 import { useGetSuppliers } from "@/hooks/use-mock-data";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export default function GoodsReceipt() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [openDialog, setOpenDialog] = useState(false);
   
   // Get goods receipts data
   const { data: goodsReceipts = [], isLoading, isError } = useGetGoodsReceipts();
@@ -54,6 +57,16 @@ export default function GoodsReceipt() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const handleCreateReceipt = () => {
+    // Hiện thị dialog tạo phiếu nhập hàng
+    setOpenDialog(true);
+  };
+
+  const handleViewReceipt = (id: number) => {
+    toast.info(`Xem chi tiết phiếu nhập hàng #${id}`);
+    // Sẽ xử lý xem chi tiết phiếu nhập hàng
+  };
   
   return (
     <div className="space-y-6">
@@ -79,10 +92,27 @@ export default function GoodsReceipt() {
               <FileDown className="mr-2 h-4 w-4" />
               Xuất báo cáo
             </Button>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Tạo phiếu nhập hàng
-            </Button>
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger asChild>
+                <Button onClick={handleCreateReceipt}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Tạo phiếu nhập hàng
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[700px]">
+                <DialogHeader>
+                  <DialogTitle>Tạo phiếu nhập hàng mới</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                  <p className="text-center text-muted-foreground">
+                    Chức năng tạo phiếu nhập hàng đang được phát triển và sẽ sẵn sàng trong phiên bản tiếp theo.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button onClick={() => setOpenDialog(false)}>Đóng</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
         
@@ -95,7 +125,7 @@ export default function GoodsReceipt() {
             <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
             <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
             <p className="text-muted-foreground mt-1 mb-4">
-              Đã xảy ra lỗi khi tải dữ liệu nhập hàng từ API. Đang sử dụng dữ liệu mẫu.
+              Đã xảy ra lỗi khi tải dữ liệu nhập hàng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
             </p>
             <Button variant="outline" onClick={() => navigate(0)}>
               Thử lại
@@ -131,7 +161,11 @@ export default function GoodsReceipt() {
                       {getStatusBadge(item.status)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleViewReceipt(item.id)}
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
                     </TableCell>

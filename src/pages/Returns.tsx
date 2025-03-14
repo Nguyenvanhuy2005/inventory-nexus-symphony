@@ -11,12 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useGetReturns, useCreateReturn } from "@/hooks/api-hooks";
-import { useGetProducts } from "@/hooks/use-mock-data";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export default function Returns() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [openDialog, setOpenDialog] = useState(false);
   
   // Get returns data
   const { data: returns = [], isLoading, isError } = useGetReturns();
@@ -62,6 +64,15 @@ export default function Returns() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const handleCreateReturn = () => {
+    setOpenDialog(true);
+  };
+
+  const handleViewReturn = (id: number) => {
+    toast.info(`Xem chi tiết phiếu trả hàng #${id}`);
+    // Sẽ xử lý xem chi tiết phiếu trả hàng
+  };
   
   return (
     <div className="space-y-6">
@@ -87,10 +98,27 @@ export default function Returns() {
               <FileDown className="mr-2 h-4 w-4" />
               Xuất báo cáo
             </Button>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Tạo phiếu trả hàng
-            </Button>
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger asChild>
+                <Button onClick={handleCreateReturn}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Tạo phiếu trả hàng
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[700px]">
+                <DialogHeader>
+                  <DialogTitle>Tạo phiếu trả hàng mới</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                  <p className="text-center text-muted-foreground">
+                    Chức năng tạo phiếu trả hàng đang được phát triển và sẽ sẵn sàng trong phiên bản tiếp theo.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button onClick={() => setOpenDialog(false)}>Đóng</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
         
@@ -102,15 +130,15 @@ export default function Returns() {
           </TabsList>
           
           <TabsContent value="all" className="mt-4">
-            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge)}
+            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, handleViewReturn)}
           </TabsContent>
           
           <TabsContent value="customer" className="mt-4">
-            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge)}
+            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, handleViewReturn)}
           </TabsContent>
           
           <TabsContent value="supplier" className="mt-4">
-            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge)}
+            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, handleViewReturn)}
           </TabsContent>
         </Tabs>
       </Card>
@@ -118,7 +146,7 @@ export default function Returns() {
   );
 }
 
-function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge) {
+function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, onViewReturn) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -133,7 +161,7 @@ function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getSt
         <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
         <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
         <p className="text-muted-foreground mt-1 mb-4">
-          Đã xảy ra lỗi khi tải dữ liệu trả hàng từ API. Đang sử dụng dữ liệu mẫu.
+          Đã xảy ra lỗi khi tải dữ liệu trả hàng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
         </p>
         <Button variant="outline" onClick={() => navigate(0)}>
           Thử lại
@@ -181,13 +209,17 @@ function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getSt
               <TableCell>{item.entity_name}</TableCell>
               <TableCell>{formatCurrency(item.total_amount.toString())}</TableCell>
               <TableCell>
-                {getPaymentBadge(item.payment_status)}
+                {getPaymentBadge(item.payment_status || 'pending')}
               </TableCell>
               <TableCell>
                 {getStatusBadge(item.status)}
               </TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="icon">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => onViewReturn(item.id)}
+                >
                   <Eye className="h-4 w-4" />
                 </Button>
               </TableCell>

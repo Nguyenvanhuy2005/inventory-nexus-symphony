@@ -178,7 +178,7 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
       url = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
     }
     
-    console.log(`Fetching Custom API: ${endpoint}`);
+    console.log(`Fetching Custom API: ${endpoint}`, url);
     
     const response = await fetch(url, {
       method: options.method || 'GET',
@@ -231,7 +231,13 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
  */
 export async function checkAPIStatus() {
   try {
-    const result = await fetchCustomAPI('/status', { suppressToast: true });
+    // Thêm timestamp để tránh cache
+    const timestamp = new Date().getTime();
+    const result = await fetchCustomAPI('/status', { 
+      suppressToast: true,
+      params: { '_': timestamp.toString() }
+    });
+    
     return {
       isConnected: true,
       status: result
@@ -344,3 +350,11 @@ export async function getWordPressUsers() {
   return await fetchWordPress('/users?per_page=100');
 }
 
+/**
+ * Thêm endpoint status mới để kiểm tra kết nối
+ */
+register_rest_route('custom/v1', '/status', array(
+    'methods' => 'GET',
+    'callback' => 'hmm_api_status',
+    'permission_callback' => '__return_true',
+));

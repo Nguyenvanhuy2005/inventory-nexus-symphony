@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -7,8 +8,7 @@ import { Search, Plus, FileDown, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { useGetDamagedStock, useCreateDamagedStock } from "@/hooks/api-hooks";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -216,7 +216,7 @@ export default function DamagedStock() {
             <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
             <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
             <p className="text-muted-foreground mt-1 mb-4">
-              Đã xảy ra lỗi khi tải dữ liệu hàng hỏng từ API. Đang sử dụng dữ liệu mẫu.
+              Đã xảy ra lỗi khi tải dữ liệu hàng hỏng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
             </p>
             <Button variant="outline" onClick={() => navigate(0)}>
               Thử lại
