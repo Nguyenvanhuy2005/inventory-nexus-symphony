@@ -11,13 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useGetGoodsReceipts, useCreateGoodsReceipt } from "@/hooks/api-hooks";
 import { useGetSuppliers } from "@/hooks/use-mock-data";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { exportToCSV } from "@/lib/api-utils";
+import CreateGoodsReceiptForm from "@/components/inventory/CreateGoodsReceiptForm";
 import { toast } from "sonner";
 
 export default function GoodsReceipt() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   
   // Get goods receipts data
   const { data: goodsReceipts = [], isLoading, isError } = useGetGoodsReceipts();
@@ -59,13 +62,40 @@ export default function GoodsReceipt() {
   };
 
   const handleCreateReceipt = () => {
-    // Hiện thị dialog tạo phiếu nhập hàng
+    // Show dialog for creating new goods receipt
     setOpenDialog(true);
   };
 
   const handleViewReceipt = (id: number) => {
-    toast.info(`Xem chi tiết phiếu nhập hàng #${id}`);
-    // Sẽ xử lý xem chi tiết phiếu nhập hàng
+    setSelectedReceiptId(id);
+    // Will handle viewing detailed goods receipt
+  };
+  
+  const handleExportReport = () => {
+    if (filteredReceipts.length === 0) {
+      toast.error("Không có dữ liệu để xuất báo cáo");
+      return;
+    }
+    
+    // Format data for CSV export
+    const reportData = filteredReceipts.map(receipt => ({
+      'Mã phiếu': receipt.receipt_id,
+      'Ngày': formatDate(receipt.date),
+      'Nhà cung cấp': receipt.supplier_name,
+      'Tổng tiền': receipt.total_amount,
+      'Đã thanh toán': receipt.payment_amount,
+      'Còn nợ': receipt.total_amount - receipt.payment_amount,
+      'Trạng thái thanh toán': receipt.payment_status === 'paid' ? 'Đã thanh toán' : 
+                              receipt.payment_status === 'partial' ? 'Một phần' : 'Chờ thanh toán',
+      'Trạng thái': receipt.status === 'completed' ? 'Hoàn thành' : 
+                   receipt.status === 'processing' ? 'Đang xử lý' : 
+                   receipt.status === 'pending' ? 'Chờ xử lý' : 'Đã hủy',
+      'Người tạo': receipt.created_by || '',
+      'Ghi chú': receipt.notes || ''
+    }));
+    
+    // Export to CSV
+    exportToCSV('phieu-nhap-hang', reportData);
   };
   
   return (
@@ -88,7 +118,7 @@ export default function GoodsReceipt() {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExportReport}>
               <FileDown className="mr-2 h-4 w-4" />
               Xuất báo cáo
             </Button>
@@ -99,18 +129,14 @@ export default function GoodsReceipt() {
                   Tạo phiếu nhập hàng
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[700px]">
+              <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
                   <DialogTitle>Tạo phiếu nhập hàng mới</DialogTitle>
+                  <DialogDescription>
+                    Nhập thông tin phiếu nhập hàng từ nhà cung cấp
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                  <p className="text-center text-muted-foreground">
-                    Chức năng tạo phiếu nhập hàng đang được phát triển và sẽ sẵn sàng trong phiên bản tiếp theo.
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button onClick={() => setOpenDialog(false)}>Đóng</Button>
-                </DialogFooter>
+                <CreateGoodsReceiptForm onSuccess={() => setOpenDialog(false)} />
               </DialogContent>
             </Dialog>
           </div>
@@ -185,6 +211,25 @@ export default function GoodsReceipt() {
           </div>
         )}
       </Card>
+
+      {/* View Receipt Dialog */}
+      {selectedReceiptId && (
+        <Dialog open={!!selectedReceiptId} onOpenChange={() => setSelectedReceiptId(null)}>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Chi tiết phiếu nhập hàng</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-center text-muted-foreground">
+                Đang tải chi tiết phiếu nhập hàng...
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setSelectedReceiptId(null)}>Đóng</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

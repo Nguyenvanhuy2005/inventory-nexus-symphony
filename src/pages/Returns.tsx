@@ -11,29 +11,34 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useGetReturns, useCreateReturn } from "@/hooks/api-hooks";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { exportToCSV } from "@/lib/api-utils";
+import CreateReturnForm from "@/components/inventory/CreateReturnForm";
 import { toast } from "sonner";
 
 export default function Returns() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
+  const [tab, setTab] = useState("all");
   const [openDialog, setOpenDialog] = useState(false);
+  const [selectedReturnId, setSelectedReturnId] = useState<number | null>(null);
   
   // Get returns data
   const { data: returns = [], isLoading, isError } = useGetReturns();
   
-  // Filter returns based on search term and active tab
+  // Filter returns based on search term and tab
   const filteredReturns = returns.filter(item => {
-    const matchesSearch = 
-      item.entity_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      item.return_id?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = item.return_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.entity_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    if (activeTab === "all") return matchesSearch;
-    return matchesSearch && item.type === (activeTab === "customer" ? "customer" : "supplier");
+    if (tab === "all") return matchesSearch;
+    if (tab === "customer") return item.type === "customer" && matchesSearch;
+    if (tab === "supplier") return item.type === "supplier" && matchesSearch;
+    
+    return matchesSearch;
   });
   
-  // Get badge color based on status
+  // Get status badge
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'completed':
@@ -49,19 +54,15 @@ export default function Returns() {
     }
   };
   
-  // Get payment status badge
-  const getPaymentBadge = (status: string) => {
-    switch(status) {
-      case 'paid':
-        return <Badge className="bg-green-500">Đã thanh toán</Badge>;
-      case 'refunded':
-        return <Badge className="bg-purple-500">Đã hoàn tiền</Badge>;
-      case 'partial':
-        return <Badge className="bg-yellow-500">Một phần</Badge>;
-      case 'pending':
-        return <Badge className="bg-gray-500">Chờ thanh toán</Badge>;
+  // Get type badge
+  const getTypeBadge = (type: string) => {
+    switch(type) {
+      case 'customer':
+        return <Badge variant="outline">Khách hàng</Badge>;
+      case 'supplier':
+        return <Badge variant="outline">Nhà cung cấp</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{type}</Badge>;
     }
   };
 
@@ -70,8 +71,32 @@ export default function Returns() {
   };
 
   const handleViewReturn = (id: number) => {
-    toast.info(`Xem chi tiết phiếu trả hàng #${id}`);
-    // Sẽ xử lý xem chi tiết phiếu trả hàng
+    setSelectedReturnId(id);
+  };
+  
+  const handleExportReport = () => {
+    if (filteredReturns.length === 0) {
+      toast.error("Không có dữ liệu để xuất báo cáo");
+      return;
+    }
+    
+    // Format data for CSV export
+    const reportData = filteredReturns.map(item => ({
+      'Mã phiếu': item.return_id,
+      'Ngày': formatDate(item.date),
+      'Loại': item.type === 'customer' ? 'Khách hàng' : 'Nhà cung cấp',
+      'Tên đối tác': item.entity_name,
+      'Tổng tiền': item.total_amount,
+      'Trạng thái': item.status === 'completed' ? 'Hoàn thành' : 
+                   item.status === 'processing' ? 'Đang xử lý' : 
+                   item.status === 'pending' ? 'Chờ xử lý' : 'Đã hủy',
+      'Lý do': item.reason || '',
+      'Người tạo': item.created_by || '',
+      'Ghi chú': item.notes || ''
+    }));
+    
+    // Export to CSV
+    exportToCSV('phieu-tra-hang', reportData);
   };
   
   return (
@@ -94,7 +119,7 @@ export default function Returns() {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExportReport}>
               <FileDown className="mr-2 h-4 w-4" />
               Xuất báo cáo
             </Button>
@@ -105,24 +130,20 @@ export default function Returns() {
                   Tạo phiếu trả hàng
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[700px]">
+              <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
                   <DialogTitle>Tạo phiếu trả hàng mới</DialogTitle>
+                  <DialogDescription>
+                    Nhập thông tin phiếu trả hàng từ khách hàng hoặc trả hàng cho nhà cung cấp
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                  <p className="text-center text-muted-foreground">
-                    Chức năng tạo phiếu trả hàng đang được phát triển và sẽ sẵn sàng trong phiên bản tiếp theo.
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button onClick={() => setOpenDialog(false)}>Đóng</Button>
-                </DialogFooter>
+                <CreateReturnForm onSuccess={() => setOpenDialog(false)} />
               </DialogContent>
             </Dialog>
           </div>
         </div>
         
-        <Tabs defaultValue="all" className="mt-6" onValueChange={setActiveTab}>
+        <Tabs defaultValue="all" className="mt-4" value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="all">Tất cả</TabsTrigger>
             <TabsTrigger value="customer">Khách hàng</TabsTrigger>
@@ -130,26 +151,88 @@ export default function Returns() {
           </TabsList>
           
           <TabsContent value="all" className="mt-4">
-            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, handleViewReturn)}
+            <ReturnsTable 
+              returns={filteredReturns} 
+              isLoading={isLoading} 
+              isError={isError}
+              getStatusBadge={getStatusBadge}
+              getTypeBadge={getTypeBadge}
+              onRetry={() => navigate(0)}
+              onViewReturn={handleViewReturn}
+            />
           </TabsContent>
           
           <TabsContent value="customer" className="mt-4">
-            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, handleViewReturn)}
+            <ReturnsTable 
+              returns={filteredReturns} 
+              isLoading={isLoading} 
+              isError={isError}
+              getStatusBadge={getStatusBadge}
+              getTypeBadge={getTypeBadge}
+              onRetry={() => navigate(0)}
+              onViewReturn={handleViewReturn}
+            />
           </TabsContent>
           
           <TabsContent value="supplier" className="mt-4">
-            {renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, handleViewReturn)}
+            <ReturnsTable 
+              returns={filteredReturns} 
+              isLoading={isLoading} 
+              isError={isError}
+              getStatusBadge={getStatusBadge}
+              getTypeBadge={getTypeBadge}
+              onRetry={() => navigate(0)}
+              onViewReturn={handleViewReturn}
+            />
           </TabsContent>
         </Tabs>
       </Card>
+
+      {/* View Return Dialog */}
+      {selectedReturnId && (
+        <Dialog open={!!selectedReturnId} onOpenChange={() => setSelectedReturnId(null)}>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Chi tiết phiếu trả hàng</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-center text-muted-foreground">
+                Đang tải chi tiết phiếu trả hàng...
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setSelectedReturnId(null)}>Đóng</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
 
-function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getStatusBadge, getPaymentBadge, onViewReturn) {
+// Table component for Returns
+interface ReturnsTableProps {
+  returns: any[];
+  isLoading: boolean;
+  isError: boolean;
+  getStatusBadge: (status: string) => JSX.Element;
+  getTypeBadge: (type: string) => JSX.Element;
+  onRetry: () => void;
+  onViewReturn: (id: number) => void;
+}
+
+function ReturnsTable({ 
+  returns, 
+  isLoading, 
+  isError, 
+  getStatusBadge, 
+  getTypeBadge,
+  onRetry,
+  onViewReturn
+}: ReturnsTableProps) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="mt-8 flex items-center justify-center">
         <p>Đang tải dữ liệu...</p>
       </div>
     );
@@ -157,26 +240,26 @@ function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getSt
   
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
+      <div className="mt-8 flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
         <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
         <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
         <p className="text-muted-foreground mt-1 mb-4">
           Đã xảy ra lỗi khi tải dữ liệu trả hàng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
         </p>
-        <Button variant="outline" onClick={() => navigate(0)}>
+        <Button variant="outline" onClick={onRetry}>
           Thử lại
         </Button>
       </div>
     );
   }
   
-  if (filteredReturns.length === 0) {
+  if (returns.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8 border border-dashed rounded-lg">
+      <div className="mt-8 flex items-center justify-center p-8 border border-dashed rounded-lg">
         <div className="text-center">
           <h3 className="text-lg font-medium">Chưa có phiếu trả hàng</h3>
           <p className="text-muted-foreground mt-1">
-            Tạo phiếu trả hàng mới để quản lý việc trả hàng từ khách hàng hoặc trả hàng cho nhà cung cấp
+            Tạo phiếu trả hàng mới để quản lý việc trả hàng
           </p>
         </div>
       </div>
@@ -191,29 +274,21 @@ function renderReturnsTable(filteredReturns, isLoading, isError, navigate, getSt
             <TableHead>Mã phiếu</TableHead>
             <TableHead>Ngày</TableHead>
             <TableHead>Loại</TableHead>
-            <TableHead>Đối tượng</TableHead>
+            <TableHead>Tên đối tác</TableHead>
             <TableHead>Tổng tiền</TableHead>
-            <TableHead>Thanh toán</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead className="text-right">Thao tác</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredReturns.map((item) => (
+          {returns.map((item) => (
             <TableRow key={item.id}>
               <TableCell className="font-medium">{item.return_id}</TableCell>
               <TableCell>{formatDate(item.date)}</TableCell>
-              <TableCell>
-                {item.type === 'customer' ? 'Khách hàng' : 'Nhà cung cấp'}
-              </TableCell>
+              <TableCell>{getTypeBadge(item.type)}</TableCell>
               <TableCell>{item.entity_name}</TableCell>
               <TableCell>{formatCurrency(item.total_amount.toString())}</TableCell>
-              <TableCell>
-                {getPaymentBadge(item.payment_status || 'pending')}
-              </TableCell>
-              <TableCell>
-                {getStatusBadge(item.status)}
-              </TableCell>
+              <TableCell>{getStatusBadge(item.status)}</TableCell>
               <TableCell className="text-right">
                 <Button 
                   variant="ghost" 
