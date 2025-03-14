@@ -9,6 +9,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api-utils";
+import { toast } from "sonner";
+import { CheckCircle, AlertCircle } from "lucide-react";
 
 // Validation schema for API settings
 const apiSettingsSchema = z.object({
@@ -22,6 +25,13 @@ const apiSettingsSchema = z.object({
 type ApiSettingsFormValues = z.infer<typeof apiSettingsSchema>;
 
 export default function Settings() {
+  const [apiStatus, setApiStatus] = useState({
+    woocommerce: null as boolean | null,
+    wordpress: null as boolean | null,
+    custom: null as boolean | null
+  });
+  const [isTesting, setIsTesting] = useState(false);
+
   // Setup form
   const form = useForm<ApiSettingsFormValues>({
     resolver: zodResolver(apiSettingsSchema),
@@ -37,7 +47,56 @@ export default function Settings() {
   // Handle form submission
   const onSubmit = (data: ApiSettingsFormValues) => {
     console.log("API Settings:", data);
-    // TODO: Save settings
+    // Lưu các giá trị vào localStorage để có thể sử dụng lại
+    localStorage.setItem('api_settings', JSON.stringify(data));
+    toast.success("Cài đặt API đã được lưu");
+    // TODO: Implement saving settings to backend
+  };
+  
+  // Test API connections
+  const testConnections = async () => {
+    setIsTesting(true);
+    setApiStatus({
+      woocommerce: null,
+      wordpress: null,
+      custom: null
+    });
+    
+    try {
+      // Test WooCommerce API
+      await fetchWooCommerce('/products?per_page=1', { suppressToast: true });
+      setApiStatus(prev => ({ ...prev, woocommerce: true }));
+    } catch (error) {
+      console.error('WooCommerce API test failed:', error);
+      setApiStatus(prev => ({ ...prev, woocommerce: false }));
+    }
+    
+    try {
+      // Test WordPress API
+      await fetchWordPress('/posts?per_page=1', { suppressToast: true });
+      setApiStatus(prev => ({ ...prev, wordpress: true }));
+    } catch (error) {
+      console.error('WordPress API test failed:', error);
+      setApiStatus(prev => ({ ...prev, wordpress: false }));
+    }
+    
+    try {
+      // Test Custom API
+      await fetchCustomAPI('/damaged-stock', { suppressToast: true });
+      setApiStatus(prev => ({ ...prev, custom: true }));
+    } catch (error) {
+      console.error('Custom API test failed:', error);
+      setApiStatus(prev => ({ ...prev, custom: false }));
+    }
+    
+    setIsTesting(false);
+  };
+  
+  const getStatusIcon = (status: boolean | null) => {
+    if (status === null) return null;
+    return status ? 
+      <CheckCircle className="h-5 w-5 text-green-500" /> : 
+      <AlertCircle className="h-5 w-5 text-red-500" />;
   };
 
   return (
@@ -57,6 +116,21 @@ export default function Settings() {
           </TabsList>
           
           <TabsContent value="api" className="mt-4">
+            <div className="mb-4 p-4 border border-yellow-200 bg-yellow-50 rounded-md">
+              <h3 className="font-medium text-yellow-800">Thông tin quan trọng về plugin HMM Custom API</h3>
+              <p className="text-yellow-700 mt-1">
+                Để sử dụng đầy đủ các tính năng của ứng dụng, vui lòng cài đặt plugin HMM Custom API vào website WordPress của bạn. 
+                Plugin này tạo các endpoint API tùy chỉnh để truy cập và quản lý dữ liệu.
+              </p>
+              <p className="text-yellow-700 mt-2">
+                File plugin đã được tạo tại: <code className="bg-yellow-100 px-2 py-1 rounded">public/hmm-custom-api/hmm-custom-api.php</code>
+              </p>
+              <p className="text-yellow-700 mt-2">
+                Tải file này lên thư mục <code className="bg-yellow-100 px-2 py-1 rounded">wp-content/plugins/</code> trên website WordPress của bạn, 
+                sau đó kích hoạt plugin trong trang quản trị WordPress.
+              </p>
+            </div>
+            
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -65,9 +139,12 @@ export default function Settings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>WooCommerce API URL</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        {getStatusIcon(apiStatus.woocommerce)}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -109,9 +186,12 @@ export default function Settings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>WordPress Username</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        {getStatusIcon(apiStatus.wordpress)}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -131,7 +211,32 @@ export default function Settings() {
                   )}
                 />
                 
-                <div className="flex justify-end">
+                <div className="flex items-center mt-4 border-t pt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Custom API: </span>
+                    {getStatusIcon(apiStatus.custom)}
+                    {apiStatus.custom === false && (
+                      <span className="text-sm text-red-500">
+                        Plugin chưa được cài đặt hoặc kích hoạt
+                      </span>
+                    )}
+                    {apiStatus.custom === true && (
+                      <span className="text-sm text-green-500">
+                        Plugin đã được cài đặt và hoạt động tốt
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex justify-between">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={testConnections}
+                    disabled={isTesting}
+                  >
+                    {isTesting ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
+                  </Button>
                   <Button type="submit">Lưu cài đặt</Button>
                 </div>
               </form>
