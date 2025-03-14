@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { fetchWooCommerce, fetchWordPress, fetchCustomAPI, checkAPIStatus } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchWordPress, fetchCustomAPI, checkAPIStatus, getWordPressUsers } from "@/lib/api-utils";
 import { toast } from "sonner";
 import { 
   CheckCircle, 
@@ -17,15 +18,21 @@ import {
   Info, 
   X, 
   CheckCheck, 
-  AlertTriangle 
+  AlertTriangle,
+  User,
+  UserCog,
+  Lock
 } from "lucide-react";
 import { 
   Dialog, 
   DialogContent, 
   DialogDescription, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useQuery } from "@tanstack/react-query";
 
 // Validation schema for API settings
 const apiSettingsSchema = z.object({
@@ -38,6 +45,22 @@ const apiSettingsSchema = z.object({
 
 type ApiSettingsFormValues = z.infer<typeof apiSettingsSchema>;
 
+// Cấu trúc dữ liệu role cho user
+interface Role {
+  id: string;
+  name: string;
+  capabilities: Record<string, boolean>;
+}
+
+// Cấu trúc dữ liệu user từ WordPress
+interface WPUser {
+  id: number;
+  name: string;
+  email?: string;
+  roles: string[];
+  avatar_urls?: Record<string, string>;
+}
+
 export default function Settings() {
   const [apiStatus, setApiStatus] = useState({
     woocommerce: null as boolean | null,
@@ -46,7 +69,16 @@ export default function Settings() {
   });
   const [isTesting, setIsTesting] = useState(false);
   const [openPluginInfo, setOpenPluginInfo] = useState(false);
+  const [openUserDialog, setOpenUserDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<WPUser | null>(null);
   const [detailedStatus, setDetailedStatus] = useState<any>(null);
+
+  // Fetch WordPress users
+  const { data: wpUsers = [], isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['wordpress-users'],
+    queryFn: getWordPressUsers,
+    staleTime: 5 * 60 * 1000 // 5 minutes
+  });
 
   // Setup form
   const form = useForm<ApiSettingsFormValues>({
@@ -137,6 +169,12 @@ export default function Settings() {
       <AlertCircle className="h-5 w-5 text-red-500" />;
   };
 
+  // Mở dialog chỉnh sửa người dùng
+  const handleEditUser = (user: WPUser) => {
+    setSelectedUser(user);
+    setOpenUserDialog(true);
+  };
+
   return (
     <div className="space-y-6">
       <DashboardHeader 
@@ -150,7 +188,6 @@ export default function Settings() {
             <TabsTrigger value="api">Cài đặt API</TabsTrigger>
             <TabsTrigger value="users">Quản lý người dùng</TabsTrigger>
             <TabsTrigger value="system">Cài đặt hệ thống</TabsTrigger>
-            <TabsTrigger value="integrations">Tích hợp</TabsTrigger>
           </TabsList>
           
           <TabsContent value="api" className="mt-4">
@@ -310,13 +347,105 @@ export default function Settings() {
           </TabsContent>
           
           <TabsContent value="users" className="mt-4">
-            <div className="mt-8 flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-lg font-medium">Tính năng đang được phát triển</h3>
-                <p className="text-muted-foreground mt-1">
-                  Chức năng quản lý người dùng sẽ sớm được triển khai
-                </p>
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium flex items-center">
+                  <UserCog className="mr-2 h-5 w-5" />
+                  Quản lý người dùng hệ thống
+                </h3>
               </div>
+              
+              {apiStatus.wordpress === true ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead>Người dùng</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Vai trò</TableHead>
+                        <TableHead className="text-right">Thao tác</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoadingUsers ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            <div className="flex justify-center items-center">
+                              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : wpUsers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            Không tìm thấy người dùng nào
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        wpUsers.map((user: any) => (
+                          <TableRow key={user.id}>
+                            <TableCell>
+                              {user.avatar_urls?.["48"] ? (
+                                <img 
+                                  src={user.avatar_urls["48"]} 
+                                  alt={user.name}
+                                  className="w-8 h-8 rounded-full"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                  <User className="h-4 w-4 text-gray-500" />
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell>{user.email || "—"}</TableCell>
+                            <TableCell>
+                              {user.roles?.map(role => (
+                                <span 
+                                  key={role} 
+                                  className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1"
+                                >
+                                  {role === 'administrator' ? 'Quản trị viên' : 
+                                   role === 'editor' ? 'Biên tập viên' :
+                                   role === 'author' ? 'Tác giả' :
+                                   role === 'contributor' ? 'Cộng tác viên' :
+                                   role === 'subscriber' ? 'Người đăng ký' : role}
+                                </span>
+                              ))}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                              >
+                                Phân quyền
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
+                  <Lock className="h-10 w-10 text-gray-400 mb-2" />
+                  <h3 className="text-lg font-medium">Kết nối WordPress API để quản lý người dùng</h3>
+                  <p className="text-muted-foreground mt-1 mb-4">
+                    Bạn cần kết nối thành công với WordPress API trong tab Cài đặt API để có thể quản lý người dùng
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => document.querySelector('[data-value="api"]')?.dispatchEvent(
+                      new MouseEvent('click', { bubbles: true })
+                    )}
+                  >
+                    Đi đến cài đặt API
+                  </Button>
+                </div>
+              )}
             </div>
           </TabsContent>
           
@@ -326,17 +455,6 @@ export default function Settings() {
                 <h3 className="text-lg font-medium">Tính năng đang được phát triển</h3>
                 <p className="text-muted-foreground mt-1">
                   Chức năng cài đặt hệ thống sẽ sớm được triển khai
-                </p>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="integrations" className="mt-4">
-            <div className="mt-8 flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-lg font-medium">Tính năng đang được phát triển</h3>
-                <p className="text-muted-foreground mt-1">
-                  Chức năng tích hợp sẽ sớm được triển khai
                 </p>
               </div>
             </div>
@@ -386,6 +504,101 @@ export default function Settings() {
               </p>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* User Edit Dialog */}
+      <Dialog open={openUserDialog} onOpenChange={setOpenUserDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Phân quyền người dùng</DialogTitle>
+            <DialogDescription>
+              Điều chỉnh quyền truy cập cho người dùng {selectedUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm">Phân quyền truy cập</h4>
+              
+              <div className="space-y-3 border rounded-md p-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="perm-inventory" disabled />
+                  <label
+                    htmlFor="perm-inventory"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Quản lý kho
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="perm-products" disabled />
+                  <label
+                    htmlFor="perm-products"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Quản lý sản phẩm
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="perm-sales" disabled />
+                  <label
+                    htmlFor="perm-sales"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Quản lý bán hàng
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="perm-customers" disabled />
+                  <label
+                    htmlFor="perm-customers"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Quản lý khách hàng
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="perm-suppliers" disabled />
+                  <label
+                    htmlFor="perm-suppliers"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Quản lý nhà cung cấp
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="perm-reports" disabled />
+                  <label
+                    htmlFor="perm-reports"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Xem báo cáo
+                  </label>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Tính năng phân quyền chi tiết sẽ được triển khai trong bản cập nhật tiếp theo.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenUserDialog(false)}>
+              Đóng
+            </Button>
+            <Button disabled>
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -44,6 +44,7 @@ interface ApiOptions {
   headers?: Record<string, string>;
   suppressToast?: boolean; // Add option to suppress toast notifications
   retryCount?: number; // Số lần thử lại khi có lỗi
+  params?: Record<string, string>; // Thêm tham số query string
 }
 
 /**
@@ -53,11 +54,21 @@ export async function fetchWooCommerce(endpoint: string, options: ApiOptions = {
   const retryCount = options.retryCount || 0;
   
   try {
-    const url = `${WOO_API_URL}${endpoint}`;
+    let url = `${WOO_API_URL}${endpoint}`;
     const params = new URLSearchParams();
+    
+    // Thêm consumer key và secret
     params.append('consumer_key', CONSUMER_KEY);
     params.append('consumer_secret', CONSUMER_SECRET);
+    
+    // Thêm các tham số bổ sung
+    if (options.params) {
+      Object.entries(options.params).forEach(([key, value]) => {
+        params.append(key, value);
+      });
+    }
 
+    // Thêm params vào URL
     const requestUrl = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
     
     console.log(`Fetching WooCommerce API: ${endpoint}`);
@@ -101,8 +112,17 @@ export async function fetchWordPress(endpoint: string, options: ApiOptions = {})
   const retryCount = options.retryCount || 0;
   
   try {
-    const url = `${WP_API_URL}${endpoint}`;
+    let url = `${WP_API_URL}${endpoint}`;
     const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
+    
+    // Thêm các tham số vào URL nếu có
+    if (options.params) {
+      const params = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        params.append(key, value);
+      });
+      url = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
+    }
     
     console.log(`Fetching WordPress API: ${endpoint}`);
     
@@ -146,8 +166,17 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
   const retryCount = options.retryCount || 0;
   
   try {
-    const url = `${CUSTOM_API_URL}${endpoint}`;
+    let url = `${CUSTOM_API_URL}${endpoint}`;
     const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
+    
+    // Thêm các tham số vào URL nếu có
+    if (options.params) {
+      const params = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        params.append(key, value);
+      });
+      url = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
+    }
     
     console.log(`Fetching Custom API: ${endpoint}`);
     
@@ -215,3 +244,103 @@ export async function checkAPIStatus() {
     };
   }
 }
+
+/**
+ * Upload file lên WooCommerce Media
+ */
+export async function uploadMedia(file: File) {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
+    
+    const response = await fetch(`${WP_API_URL}/media`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error(`Upload media error: ${response.status}`, errorText);
+      throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading media:', error);
+    toast.error('Lỗi khi tải lên tập tin');
+    throw error;
+  }
+}
+
+/**
+ * Tạo tập tin PDF từ dữ liệu và tải xuống
+ */
+export function generatePDF(filename: string, htmlContent: string) {
+  try {
+    // Chức năng này sẽ được triển khai khi thêm thư viện tạo PDF
+    toast.error('Chức năng xuất PDF sẽ được triển khai trong bản cập nhật tiếp theo');
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    toast.error('Lỗi khi tạo tập tin PDF');
+  }
+}
+
+/**
+ * Tạo và tải xuống tập tin CSV từ dữ liệu
+ */
+export function exportToCSV(filename: string, rows: any[]) {
+  if (!rows || rows.length === 0) {
+    toast.error('Không có dữ liệu để xuất');
+    return;
+  }
+  
+  try {
+    // Tạo tiêu đề từ keys của object đầu tiên
+    const headers = Object.keys(rows[0]);
+    
+    // Chuyển các dòng thành chuỗi CSV
+    const csvContent = [
+      headers.join(','), // Tiêu đề
+      ...rows.map(row => {
+        return headers.map(header => {
+          // Đảm bảo các giá trị có dấu phẩy được bọc trong dấu ngoặc kép
+          const cell = row[header] === null || row[header] === undefined ? '' : row[header];
+          return typeof cell === 'string' && cell.includes(',') 
+            ? `"${cell}"` 
+            : String(cell);
+        }).join(',');
+      })
+    ].join('\n');
+    
+    // Tạo Blob và tải xuống
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success('Xuất dữ liệu CSV thành công');
+  } catch (error) {
+    console.error('Error exporting CSV:', error);
+    toast.error('Lỗi khi xuất dữ liệu CSV');
+  }
+}
+
+/**
+ * Lấy danh sách người dùng WordPress
+ */
+export async function getWordPressUsers() {
+  return await fetchWordPress('/users?per_page=100');
+}
+

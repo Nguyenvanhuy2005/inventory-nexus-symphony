@@ -21,6 +21,15 @@ export interface Product {
   real_stock?: number;
   pending_orders?: number;
   available_to_sell?: number;
+  description?: string;
+  short_description?: string;
+  weight?: string;
+  dimensions?: {
+    length: string;
+    width: string;
+    height: string;
+  };
+  tags?: Array<{ id: number; name: string; }>;
 }
 
 // Fixed the interface to make the 'attributes' property compatible with Product interface
@@ -44,6 +53,7 @@ export interface Variation {
   real_stock?: number;
   pending_orders?: number;
   available_to_sell?: number;
+  description?: string;
 }
 
 export interface Order {
@@ -60,6 +70,8 @@ export interface Order {
     price: number;
     subtotal: string;
     total: string;
+    sku?: string;
+    meta_data?: Array<{ key: string; value: any; }>;
   }>;
   customer_id: number;
   billing: {
@@ -69,8 +81,69 @@ export interface Order {
     phone: string;
     address_1: string;
     city: string;
+    postcode?: string;
+    country?: string;
+    company?: string;
+  };
+  shipping?: {
+    first_name: string;
+    last_name: string;
+    address_1: string;
+    city: string;
+    postcode?: string;
+    country?: string;
+    company?: string;
   };
   meta_data?: Array<{ key: string; value: any; }>;
+  payment_method?: string;
+  payment_method_title?: string;
+  customer_note?: string;
+  coupon_lines?: Array<{
+    id: number;
+    code: string;
+    discount: string;
+  }>;
+  date_completed?: string;
+  date_paid?: string;
+}
+
+export interface Customer {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  username?: string;
+  billing?: {
+    first_name: string;
+    last_name: string;
+    company?: string;
+    address_1: string;
+    address_2?: string;
+    city: string;
+    postcode?: string;
+    country: string;
+    state?: string;
+    email: string;
+    phone: string;
+  };
+  shipping?: {
+    first_name: string;
+    last_name: string;
+    company?: string;
+    address_1: string;
+    address_2?: string;
+    city: string;
+    postcode?: string;
+    country: string;
+    state?: string;
+  };
+  meta_data?: Array<{ key: string; value: any; }>;
+  date_created: string;
+  date_modified?: string;
+  role?: string;
+  avatar_url?: string;
+  sales_rep_id?: number;
+  sales_rep_name?: string;
 }
 
 /**
@@ -85,6 +158,111 @@ export async function getProduct(id: number): Promise<Product> {
  */
 export async function getProductVariations(productId: number): Promise<Variation[]> {
   return await fetchWooCommerce(`/products/${productId}/variations`);
+}
+
+/**
+ * Get all products
+ */
+export async function getAllProducts(params?: Record<string, string>): Promise<Product[]> {
+  return await fetchWooCommerce('/products', { params: params || { per_page: '100' } });
+}
+
+/**
+ * Create a new product
+ */
+export async function createProduct(productData: Partial<Product>): Promise<Product> {
+  return await fetchWooCommerce('/products', {
+    method: 'POST',
+    body: productData
+  });
+}
+
+/**
+ * Update an existing product
+ */
+export async function updateProduct(productId: number, productData: Partial<Product>): Promise<Product> {
+  return await fetchWooCommerce(`/products/${productId}`, {
+    method: 'PUT',
+    body: productData
+  });
+}
+
+/**
+ * Delete a product
+ */
+export async function deleteProduct(productId: number): Promise<any> {
+  return await fetchWooCommerce(`/products/${productId}`, {
+    method: 'DELETE',
+    params: { force: 'true' }
+  });
+}
+
+/**
+ * Get all customers
+ */
+export async function getAllCustomers(params?: Record<string, string>): Promise<Customer[]> {
+  return await fetchWooCommerce('/customers', { params: params || { per_page: '100' } });
+}
+
+/**
+ * Get customer by ID
+ */
+export async function getCustomer(id: number): Promise<Customer> {
+  return await fetchWooCommerce(`/customers/${id}`);
+}
+
+/**
+ * Create a new customer
+ */
+export async function createCustomer(customerData: Partial<Customer>): Promise<Customer> {
+  return await fetchWooCommerce('/customers', {
+    method: 'POST',
+    body: customerData
+  });
+}
+
+/**
+ * Update an existing customer
+ */
+export async function updateCustomer(customerId: number, customerData: Partial<Customer>): Promise<Customer> {
+  return await fetchWooCommerce(`/customers/${customerId}`, {
+    method: 'PUT',
+    body: customerData
+  });
+}
+
+/**
+ * Get all orders
+ */
+export async function getAllOrders(params?: Record<string, string>): Promise<Order[]> {
+  return await fetchWooCommerce('/orders', { params: params || { per_page: '100' } });
+}
+
+/**
+ * Get order by ID
+ */
+export async function getOrder(id: number): Promise<Order> {
+  return await fetchWooCommerce(`/orders/${id}`);
+}
+
+/**
+ * Create a new order
+ */
+export async function createOrder(orderData: Partial<Order>): Promise<Order> {
+  return await fetchWooCommerce('/orders', {
+    method: 'POST',
+    body: orderData
+  });
+}
+
+/**
+ * Update an existing order
+ */
+export async function updateOrder(orderId: number, orderData: Partial<Order>): Promise<Order> {
+  return await fetchWooCommerce(`/orders/${orderId}`, {
+    method: 'PUT',
+    body: orderData
+  });
 }
 
 /**
@@ -174,3 +352,169 @@ export async function updateParentProductStock(productId: number): Promise<void>
     throw error;
   }
 }
+
+/**
+ * Get all product categories
+ */
+export async function getProductCategories(): Promise<Array<{ id: number; name: string; }>> {
+  return await fetchWooCommerce('/products/categories', { params: { per_page: '100' } });
+}
+
+/**
+ * Get all product tags
+ */
+export async function getProductTags(): Promise<Array<{ id: number; name: string; }>> {
+  return await fetchWooCommerce('/products/tags', { params: { per_page: '100' } });
+}
+
+/**
+ * Update variation stock
+ */
+export async function updateVariationStock(
+  productId: number, 
+  variationId: number, 
+  stockData: { stock_quantity: number; }
+): Promise<Variation> {
+  return await fetchWooCommerce(`/products/${productId}/variations/${variationId}`, {
+    method: 'PUT',
+    body: stockData
+  });
+}
+
+/**
+ * Get order notes
+ */
+export async function getOrderNotes(orderId: number): Promise<Array<{ id: number; note: string; date_created: string; }>> {
+  return await fetchWooCommerce(`/orders/${orderId}/notes`);
+}
+
+/**
+ * Add order note
+ */
+export async function addOrderNote(
+  orderId: number, 
+  note: string, 
+  isCustomerNote: boolean = false
+): Promise<{ id: number; note: string; date_created: string; }> {
+  return await fetchWooCommerce(`/orders/${orderId}/notes`, {
+    method: 'POST',
+    body: {
+      note,
+      customer_note: isCustomerNote
+    }
+  });
+}
+
+/**
+ * Get product attributes
+ */
+export async function getProductAttributes(): Promise<Array<{ id: number; name: string; slug: string; }>> {
+  return await fetchWooCommerce('/products/attributes');
+}
+
+/**
+ * Create a variation for a product
+ */
+export async function createVariation(
+  productId: number, 
+  variationData: Partial<Variation>
+): Promise<Variation> {
+  return await fetchWooCommerce(`/products/${productId}/variations`, {
+    method: 'POST',
+    body: variationData
+  });
+}
+
+/**
+ * Delete a variation
+ */
+export async function deleteVariation(
+  productId: number, 
+  variationId: number
+): Promise<any> {
+  return await fetchWooCommerce(`/products/${productId}/variations/${variationId}`, {
+    method: 'DELETE',
+    params: { force: 'true' }
+  });
+}
+
+/**
+ * Get sales by date
+ */
+export async function getSalesByDate(
+  period: 'day' | 'week' | 'month' | 'year', 
+  startDate?: string, 
+  endDate?: string
+): Promise<Array<{ date: string; total: string; }>> {
+  const params: Record<string, string> = { period };
+  if (startDate) params.date_min = startDate;
+  if (endDate) params.date_max = endDate;
+  
+  return await fetchWooCommerce('/reports/sales', { params });
+}
+
+/**
+ * Get top selling products
+ */
+export async function getTopSellingProducts(
+  period: 'week' | 'month' | 'year' = 'month'
+): Promise<Array<{ product_id: number; name: string; total: number; }>> {
+  return await fetchWooCommerce('/reports/top_sellers', { params: { period } });
+}
+
+/**
+ * Search customers
+ */
+export async function searchCustomers(search: string): Promise<Customer[]> {
+  return await fetchWooCommerce('/customers', { params: { search } });
+}
+
+/**
+ * Search products
+ */
+export async function searchProducts(search: string): Promise<Product[]> {
+  return await fetchWooCommerce('/products', { params: { search } });
+}
+
+/**
+ * Get product stock status label
+ */
+export function getStockStatusLabel(status: string): string {
+  switch (status) {
+    case 'instock':
+      return 'Còn hàng';
+    case 'outofstock':
+      return 'Hết hàng';
+    case 'onbackorder':
+      return 'Đặt trước';
+    default:
+      return status;
+  }
+}
+
+/**
+ * Get order status label
+ */
+export function getOrderStatusLabel(status: string): string {
+  switch (status) {
+    case 'pending':
+      return 'Chờ thanh toán';
+    case 'processing':
+      return 'Đang xử lý';
+    case 'on-hold':
+      return 'Tạm giữ';
+    case 'completed':
+      return 'Hoàn thành';
+    case 'cancelled':
+      return 'Đã hủy';
+    case 'refunded':
+      return 'Đã hoàn tiền';
+    case 'failed':
+      return 'Thất bại';
+    case 'trash':
+      return 'Thùng rác';
+    default:
+      return status;
+  }
+}
+
