@@ -119,21 +119,21 @@ export function useCreatePaymentReceipt() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (paymentReceipt: Omit<PaymentReceipt, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (paymentReceiptData: Omit<PaymentReceipt, 'id' | 'created_at' | 'updated_at'>) => {
       return await fetchCustomAPI('/payment-receipts', {
         method: 'POST',
-        body: paymentReceipt
+        body: paymentReceiptData
       }) as PaymentReceipt;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['paymentReceipts'] });
       // Invalidate related entity data
-      if (paymentReceipt.entity === 'customer') {
+      if (variables.entity === 'customer') {
         queryClient.invalidateQueries({ queryKey: ['customers'] });
-        queryClient.invalidateQueries({ queryKey: ['customer', paymentReceipt.entity_id.toString()] });
-      } else if (paymentReceipt.entity === 'supplier') {
+        queryClient.invalidateQueries({ queryKey: ['customer', variables.entity_id.toString()] });
+      } else if (variables.entity === 'supplier') {
         queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-        queryClient.invalidateQueries({ queryKey: ['supplier', paymentReceipt.entity_id.toString()] });
+        queryClient.invalidateQueries({ queryKey: ['supplier', variables.entity_id.toString()] });
       }
       toast.success('Phiếu thu chi đã được tạo thành công');
     },
@@ -211,16 +211,16 @@ export function useCreateReturn() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (returnData: Omit<Return, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (returnFormData: Omit<Return, 'id' | 'created_at' | 'updated_at'>) => {
       return await fetchCustomAPI('/returns', {
         method: 'POST',
-        body: returnData
+        body: returnFormData
       }) as Return;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['returns'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      if (returnData.type === 'customer') {
+      if (variables.type === 'customer') {
         queryClient.invalidateQueries({ queryKey: ['customers'] });
       } else {
         queryClient.invalidateQueries({ queryKey: ['suppliers'] });

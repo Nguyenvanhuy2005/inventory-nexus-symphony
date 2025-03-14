@@ -96,7 +96,17 @@ export default function Suppliers() {
         ...data
       });
     } else {
-      createSupplier.mutate(data);
+      // Ensure all required fields are present for createSupplier
+      const newSupplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'> = {
+        name: data.name,
+        phone: data.phone || "",
+        email: data.email || "",
+        address: data.address || "",
+        initial_debt: data.initial_debt,
+        current_debt: data.current_debt,
+        notes: data.notes
+      };
+      createSupplier.mutate(newSupplier);
     }
     setOpenDialog(false);
   };
