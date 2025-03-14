@@ -13,7 +13,7 @@ import {
   mockInventoryByCategoryData
 } from "@/lib/mock-data";
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
-import { normalizeProduct } from "@/lib/woocommerce";
+import { normalizeProduct, normalizeVariation, Product, Variation } from "@/lib/woocommerce";
 
 interface UseMockDataOptions<T> {
   queryKey: string[];
@@ -62,13 +62,13 @@ export function useMockData<T>({
  * Hook to get products with fallback to mock data
  */
 export function useGetProducts() {
-  return useMockData({
+  return useMockData<Product[]>({
     queryKey: ['products'],
     apiFn: async () => {
       const products = await fetchWooCommerce('/products?per_page=50');
-      return products.map(normalizeProduct);
+      return products.map((product: Product) => normalizeProduct(product));
     },
-    mockData: mockProducts
+    mockData: mockProducts as Product[]
   });
 }
 
@@ -76,13 +76,13 @@ export function useGetProducts() {
  * Hook to get a single product with fallback to mock data
  */
 export function useGetProduct(productId: number) {
-  return useMockData({
+  return useMockData<Product>({
     queryKey: ['product', productId.toString()],
     apiFn: async () => {
       const product = await fetchWooCommerce(`/products/${productId}`);
       return normalizeProduct(product);
     },
-    mockData: mockProducts,
+    mockData: mockProducts.find(p => p.id === productId) as Product || mockProducts[0] as Product,
     mockDataId: productId
   });
 }
@@ -91,13 +91,13 @@ export function useGetProduct(productId: number) {
  * Hook to get product variations with fallback to mock data
  */
 export function useGetProductVariations(productId: number) {
-  return useMockData({
+  return useMockData<Variation[]>({
     queryKey: ['productVariations', productId.toString()],
     apiFn: async () => {
       const variations = await fetchWooCommerce(`/products/${productId}/variations`);
-      return variations.map(normalizeProduct);
+      return variations.map((variation: Variation) => normalizeVariation(variation));
     },
-    mockData: mockVariations[productId] || []
+    mockData: (mockVariations[productId] || []) as Variation[]
   });
 }
 

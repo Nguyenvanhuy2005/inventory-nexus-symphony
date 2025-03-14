@@ -23,9 +23,27 @@ export interface Product {
   available_to_sell?: number;
 }
 
-export interface Variation extends Omit<Product, 'variations'> {
+// Fixed the interface to make the 'attributes' property compatible with Product interface
+export interface Variation {
+  id: number;
+  name: string;
+  sku?: string;
+  price: string;
+  regular_price?: string;
+  sale_price?: string;
+  stock_quantity: number;
+  stock_status: string;
+  manage_stock: boolean;
+  images: Array<{ id: number; src: string; }>;
+  categories: Array<{ id: number; name: string; }>;
+  meta_data?: Array<{ key: string; value: any; }>;
+  permalink?: string;
+  type: string;
   parent_id: number;
-  attributes: Array<{ id: number; name: string; option: string; }>;
+  attributes: Array<{ id: number; name: string; options: string[]; option?: string; }>;
+  real_stock?: number;
+  pending_orders?: number;
+  available_to_sell?: number;
 }
 
 export interface Order {
@@ -98,6 +116,29 @@ export function normalizeProduct(product: Product): Product {
   };
 }
 
+// Adjusted to handle variations by creating a normalizeVariation function
+export function normalizeVariation(variation: Variation): Variation {
+  const realStockMeta = variation.meta_data?.find(meta => meta.key === 'real_stock');
+  const pendingOrdersMeta = variation.meta_data?.find(meta => meta.key === 'pending_orders');
+  
+  const realStock = realStockMeta 
+    ? Number(realStockMeta.value) 
+    : variation.stock_quantity;
+    
+  const pendingOrders = pendingOrdersMeta 
+    ? Number(pendingOrdersMeta.value) 
+    : 0;
+    
+  const availableToSell = realStock - pendingOrders;
+  
+  return {
+    ...variation,
+    real_stock: realStock,
+    pending_orders: pendingOrders,
+    available_to_sell: availableToSell
+  };
+}
+
 /**
  * Update parent product stock based on variations
  */
@@ -111,7 +152,7 @@ export async function updateParentProductStock(productId: number): Promise<void>
     let totalPendingOrders = 0;
     
     variations.forEach(variation => {
-      const normalizedVariation = normalizeProduct(variation);
+      const normalizedVariation = normalizeVariation(variation);
       totalRealStock += normalizedVariation.real_stock || 0;
       totalPendingOrders += normalizedVariation.pending_orders || 0;
     });

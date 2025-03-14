@@ -8,10 +8,12 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   return (
-    <div className="app-container">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar />
-      <main className="main-content">
-        {children}
+      <main className="flex-1 overflow-y-auto">
+        <div className="container mx-auto px-4 py-6">
+          {children}
+        </div>
       </main>
     </div>
   );
