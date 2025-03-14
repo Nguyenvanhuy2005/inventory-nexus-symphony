@@ -57,6 +57,7 @@ export interface Customer {
 // Payment Receipt model
 export interface PaymentReceipt {
   id: number;
+  receipt_id?: string; // Added receipt_id property
   date: string;
   type: 'income' | 'expense'; // Thu/Chi
   amount: number;
@@ -71,6 +72,7 @@ export interface PaymentReceipt {
   updated_at: string;
   notes?: string;
   attachment_url?: string;
+  reference?: string;
 }
 
 // Goods Receipt model
@@ -175,7 +177,9 @@ export interface CustomerDebt {
   customer_id: number;
   customer_name: string;
   initial_debt: number;
-  current_debt: number;
-  last_updated: string;
+  current_debt: number; // This will be used instead of 'amount'
+  last_updated: string; // This will be used instead of 'updated_at'
   notes?: string;
+  customer_email?: string; // Add this property
+  customer_phone?: string; // Add this property
 }

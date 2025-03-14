@@ -25,7 +25,7 @@ export default function PaymentReceipts() {
     const matchesSearch = 
       receipt.entity_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       receipt.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      receipt.receipt_id?.toLowerCase().includes(searchTerm.toLowerCase());
+      (receipt.receipt_id && receipt.receipt_id.toLowerCase().includes(searchTerm.toLowerCase()));
       
     if (tab === "all") return matchesSearch;
     if (tab === "income") return receipt.type === "income" && matchesSearch;
