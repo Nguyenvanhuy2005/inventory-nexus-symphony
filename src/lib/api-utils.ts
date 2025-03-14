@@ -287,6 +287,7 @@ export async function checkAPIStatus() {
  */
 export async function uploadMedia(file: File) {
   try {
+    console.log('Uploading file:', file.name, file.type, file.size);
     const formData = new FormData();
     formData.append('file', file);
     
@@ -306,10 +307,52 @@ export async function uploadMedia(file: File) {
       throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log('Upload successful:', data);
+    
+    // Trả về URL của tập tin đã tải lên
+    return {
+      url: data.source_url,
+      id: data.id,
+      filename: data.title.rendered
+    };
   } catch (error) {
     console.error('Error uploading media:', error);
     toast.error('Lỗi khi tải lên tập tin');
+    throw error;
+  }
+}
+
+/**
+ * Upload file attachment cho các phiếu và lưu trữ trong Custom API
+ */
+export async function uploadAttachment(file: File, entityType: string, entityId?: number) {
+  try {
+    console.log(`Uploading attachment for ${entityType} ${entityId}:`, file.name);
+    
+    // 1. Upload the file to WordPress Media Library
+    const mediaResult = await uploadMedia(file);
+    
+    // 2. If we have an entityType and entityId, associate the file with the entity
+    if (entityType && entityId) {
+      // Gọi API tùy chỉnh để liên kết tập tin với thực thể
+      await fetchCustomAPI('/attachments', {
+        method: 'POST',
+        body: {
+          entity_type: entityType,
+          entity_id: entityId,
+          attachment_url: mediaResult.url,
+          filename: file.name,
+          mime_type: file.type,
+          media_id: mediaResult.id
+        }
+      });
+    }
+    
+    return mediaResult.url;
+  } catch (error) {
+    console.error('Error uploading attachment:', error);
+    toast.error('Lỗi khi tải lên tập tin đính kèm');
     throw error;
   }
 }
@@ -408,4 +451,110 @@ function hmm_api_status() {
         'timestamp' => current_time('mysql')
     ];
 }
+
+// CODE TO BE ADDED TO WORDPRESS PLUGIN:
+
+// Endpoint to handle file uploads
+function hmm_upload_attachment() {
+    // Check if user has permissions
+    if (!current_user_can('upload_files')) {
+        return new WP_Error('permission_denied', 'You do not have permission to upload files', ['status' => 403]);
+    }
+    
+    // Check if file was uploaded
+    if (empty($_FILES['file'])) {
+        return new WP_Error('no_file', 'No file was uploaded', ['status' => 400]);
+    }
+    
+    // Upload the file using WordPress media handling
+    $upload = wp_handle_upload($_FILES['file'], ['test_form' => false]);
+    
+    if (isset($upload['error'])) {
+        return new WP_Error('upload_error', $upload['error'], ['status' => 400]);
+    }
+    
+    // Create attachment post for the uploaded file
+    $file_path = $upload['file'];
+    $file_name = basename($file_path);
+    $file_type = wp_check_filetype($file_name, null);
+    
+    $attachment = [
+        'post_mime_type' => $file_type['type'],
+        'post_title' => sanitize_file_name($file_name),
+        'post_content' => '',
+        'post_status' => 'inherit'
+    ];
+    
+    $attach_id = wp_insert_attachment($attachment, $file_path);
+    
+    if (is_wp_error($attach_id)) {
+        return $attach_id;
+    }
+    
+    // Generate metadata for the attachment
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    $attach_data = wp_generate_attachment_metadata($attach_id, $file_path);
+    wp_update_attachment_metadata($attach_id, $attach_data);
+    
+    // Save the association in custom table if entity info provided
+    $entity_type = isset($_POST['entity_type']) ? sanitize_text_field($_POST['entity_type']) : '';
+    $entity_id = isset($_POST['entity_id']) ? intval($_POST['entity_id']) : 0;
+    
+    if (!empty($entity_type) && $entity_id > 0) {
+        global $wpdb;
+        $attachments_table = $wpdb->prefix . 'inventory_attachments';
+        
+        // Create attachments table if it doesn't exist
+        if ($wpdb->get_var("SHOW TABLES LIKE '$attachments_table'") != $attachments_table) {
+            $charset_collate = $wpdb->get_charset_collate();
+            $sql = "CREATE TABLE $attachments_table (
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                entity_type varchar(50) NOT NULL,
+                entity_id mediumint(9) NOT NULL,
+                attachment_id mediumint(9) NOT NULL,
+                attachment_url varchar(255) NOT NULL,
+                filename varchar(255) NOT NULL,
+                mime_type varchar(100) NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY  (id)
+            ) $charset_collate;";
+            
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($sql);
+        }
+        
+        // Insert attachment association
+        $wpdb->insert(
+            $attachments_table,
+            [
+                'entity_type' => $entity_type,
+                'entity_id' => $entity_id,
+                'attachment_id' => $attach_id,
+                'attachment_url' => wp_get_attachment_url($attach_id),
+                'filename' => $file_name,
+                'mime_type' => $file_type['type']
+            ]
+        );
+    }
+    
+    // Return attachment details
+    return [
+        'id' => $attach_id,
+        'url' => wp_get_attachment_url($attach_id),
+        'file' => $file_name,
+        'type' => $file_type['type']
+    ];
+}
+
+// Register attachments endpoint
+function hmm_register_attachment_endpoints() {
+    register_rest_route('custom/v1', '/attachments', [
+        'methods' => 'POST',
+        'callback' => 'hmm_upload_attachment',
+        'permission_callback' => function () {
+            return current_user_can('upload_files');
+        }
+    ]);
+}
+add_action('rest_api_init', 'hmm_register_attachment_endpoints');
 */

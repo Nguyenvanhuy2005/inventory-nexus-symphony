@@ -16,6 +16,7 @@ import { getAllCustomers } from "@/lib/woocommerce";
 import { Supplier } from "@/types/models";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
+import { uploadAttachment } from "@/lib/api-utils";
 
 // Form schema for payment receipt
 const formSchema = z.object({
@@ -46,6 +47,7 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const createMutation = useCreatePaymentReceipt();
 
   // Load customers
@@ -105,6 +107,13 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      
+      // Kiểm tra kích thước tập tin (giới hạn 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Tập tin quá lớn. Vui lòng chọn tập tin nhỏ hơn 10MB");
+        return;
+      }
+      
       setSelectedFile(file);
       
       // Create preview URL
@@ -119,27 +128,19 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
   // Submit form
   const onSubmit = async (data: FormValues) => {
     try {
+      setIsUploading(true);
       let attachmentUrl = "";
       
       // If file is selected, handle file upload first
       if (selectedFile) {
-        // Create form data for file upload
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        
-        // This is a placeholder for the API call to upload the file
-        // Replace with actual implementation
         try {
-          // Simulate file upload - in a real implementation, this would be an API call
-          // For example: const response = await uploadFile(formData);
-          // Then: attachmentUrl = response.url;
-          
-          // For now, we'll just set a placeholder URL
-          attachmentUrl = URL.createObjectURL(selectedFile);
-          console.log("File uploaded:", attachmentUrl);
+          // Upload file to server using WordPress Media API
+          attachmentUrl = await uploadAttachment(selectedFile, 'payment_receipt');
+          console.log("File uploaded successfully:", attachmentUrl);
         } catch (error) {
           console.error("Error uploading file:", error);
-          toast.error("Không thể tải lên tập tin");
+          toast.error("Không thể tải lên tập tin đính kèm");
+          setIsUploading(false);
           return;
         }
       }
@@ -151,12 +152,11 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         entity_name: data.entity_name,
         date: data.date,
         amount: parseFloat(data.amount),
-        payment_method: "cash" as const, // Default to cash since we're removing the field
         description: data.description,
         status: "completed" as const,
         created_by: "Admin", // Default created by
-        notes: data.notes,
-        attachment_url: attachmentUrl || undefined
+        notes: data.notes || "",
+        attachment_url: attachmentUrl || ""
       };
       
       await createMutation.mutateAsync(paymentReceiptData);
@@ -165,6 +165,8 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
     } catch (error) {
       console.error("Error creating payment receipt:", error);
       toast.error("Không thể tạo phiếu thu chi");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -430,8 +432,11 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         />
         
         <DialogFooter>
-          <Button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Đang lưu..." : "Lưu phiếu thu chi"}
+          <Button 
+            type="submit" 
+            disabled={createMutation.isPending || isUploading}
+          >
+            {createMutation.isPending || isUploading ? "Đang lưu..." : "Lưu phiếu thu chi"}
           </Button>
         </DialogFooter>
       </form>
