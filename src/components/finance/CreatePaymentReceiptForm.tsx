@@ -52,7 +52,12 @@ const formSchema = z.object({
   description: z.string().optional(),
 });
 
-export default function CreatePaymentReceiptForm() {
+// Define the props interface for the component
+interface CreatePaymentReceiptFormProps {
+  onSuccess?: () => void;
+}
+
+export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentReceiptFormProps) {
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const navigate = useNavigate();
@@ -150,7 +155,12 @@ export default function CreatePaymentReceiptForm() {
           : "Đã tạo phiếu thu thành công"
       );
       
-      navigate("/payment-receipts");
+      // Call onSuccess prop if provided, otherwise navigate
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate("/payment-receipts");
+      }
     } catch (error) {
       console.error("Error creating payment receipt:", error);
       toast.error("Lỗi khi tạo phiếu thu chi");
