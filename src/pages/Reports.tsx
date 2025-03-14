@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
@@ -475,14 +476,14 @@ function CustomerDebtsReport() {
   );
   
   // Tính tổng công nợ
-  const totalDebts = filteredDebts.reduce((sum, debt) => sum + parseFloat(debt.current_debt.toString()), 0);
+  const totalDebts = filteredDebts.reduce((sum, debt) => sum + parseFloat(debt.amount), 0);
   
   // Hàm xuất dữ liệu công nợ khách hàng ra CSV
   const handleExportDebts = () => {
     const exportData = filteredDebts.map(debt => ({
       'Khách hàng': debt.customer_name,
-      'Công nợ': formatCurrency(debt.current_debt.toString()),
-      'Ngày cập nhật': new Date(debt.last_updated).toLocaleDateString('vi-VN')
+      'Công nợ': formatCurrency(debt.amount.toString()),
+      'Ngày cập nhật': new Date(debt.updated_at).toLocaleDateString('vi-VN')
     }));
     
     exportToCSV('bao-cao-cong-no-khach-hang', exportData);
@@ -551,12 +552,12 @@ function CustomerDebtsReport() {
                 filteredDebts.map(debt => (
                   <TableRow key={debt.id}>
                     <TableCell className="font-medium">{debt.customer_name}</TableCell>
-                    <TableCell>{"—"}</TableCell>
-                    <TableCell>{"—"}</TableCell>
+                    <TableCell>{debt.customer_email || "—"}</TableCell>
+                    <TableCell>{debt.customer_phone || "—"}</TableCell>
                     <TableCell className="text-right font-medium text-red-600">
-                      {formatCurrency(debt.current_debt.toString())}
+                      {formatCurrency(debt.amount.toString())}
                     </TableCell>
-                    <TableCell>{new Date(debt.last_updated).toLocaleDateString('vi-VN')}</TableCell>
+                    <TableCell>{new Date(debt.updated_at).toLocaleDateString('vi-VN')}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -581,7 +582,7 @@ function SupplierDebtsReport() {
   
   // Tính tổng công nợ
   const totalDebts = filteredSuppliers.reduce((sum, supplier) => 
-    sum + (typeof supplier.current_debt === 'number' ? supplier.current_debt : parseFloat(supplier.current_debt || '0')), 0
+    sum + parseFloat(supplier.current_debt || '0'), 0
   );
   
   // Hàm xuất dữ liệu công nợ nhà cung cấp ra CSV
@@ -590,7 +591,7 @@ function SupplierDebtsReport() {
       'Nhà cung cấp': supplier.name,
       'Email': supplier.email || "—",
       'Số điện thoại': supplier.phone || "—",
-      'Công nợ': formatCurrency(supplier.current_debt?.toString() || '0'),
+      'Công nợ': formatCurrency(supplier.current_debt || '0'),
       'Ngày cập nhật': supplier.updated_at 
         ? new Date(supplier.updated_at).toLocaleDateString('vi-VN')
         : "—"
@@ -610,12 +611,7 @@ function SupplierDebtsReport() {
         <Card className="p-4">
           <h3 className="text-lg font-medium mb-2">Số nhà cung cấp có công nợ</h3>
           <p className="text-3xl font-bold">
-            {filteredSuppliers.filter(s => {
-              const debt = typeof s.current_debt === 'number' 
-                ? s.current_debt 
-                : parseFloat(s.current_debt || '0');
-              return debt > 0;
-            }).length}
+            {filteredSuppliers.filter(s => parseFloat(s.current_debt || '0') > 0).length}
           </p>
         </Card>
       </div>
@@ -672,7 +668,7 @@ function SupplierDebtsReport() {
                     <TableCell>{supplier.email || "—"}</TableCell>
                     <TableCell>{supplier.phone || "—"}</TableCell>
                     <TableCell className="text-right font-medium text-red-600">
-                      {formatCurrency(supplier.current_debt?.toString() || '0')}
+                      {formatCurrency(supplier.current_debt || '0')}
                     </TableCell>
                     <TableCell>
                       {supplier.updated_at 
@@ -690,4 +686,3 @@ function SupplierDebtsReport() {
     </div>
   );
 }
-
