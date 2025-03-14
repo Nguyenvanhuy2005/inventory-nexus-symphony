@@ -10,7 +10,6 @@ import {
   ArrowLeft, 
   DollarSign, 
   AlertTriangle,
-  BarChart, 
   Settings, 
   Tag,
 } from 'lucide-react';
@@ -116,12 +115,6 @@ export default function Sidebar() {
               label="Hàng hỏng"
               href="/damaged-stock"
               isActive={path === '/damaged-stock'}
-            />
-            <SidebarItem
-              icon={<BarChart className="h-4 w-4" />}
-              label="Báo cáo"
-              href="/reports"
-              isActive={path === '/reports'}
             />
             <SidebarItem
               icon={<Settings className="h-4 w-4" />}

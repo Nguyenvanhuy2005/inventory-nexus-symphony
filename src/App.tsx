@@ -14,7 +14,6 @@ import GoodsReceipt from "./pages/GoodsReceipt";
 import Returns from "./pages/Returns";
 import PaymentReceipts from "./pages/PaymentReceipts";
 import DamagedStock from "./pages/DamagedStock";
-import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -45,7 +44,6 @@ const App = () => (
             <Route path="/returns" element={<Returns />} />
             <Route path="/payment-receipts" element={<PaymentReceipts />} />
             <Route path="/damaged-stock" element={<DamagedStock />} />
-            <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
