@@ -1,4 +1,3 @@
-
 // Import necessary libraries and components
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -65,7 +64,12 @@ const formSchema = z.object({
   payment_status: z.enum(["pending", "partial", "paid"]).default("pending"),
 });
 
-export default function CreateGoodsReceiptForm() {
+// Define props interface
+interface CreateGoodsReceiptFormProps {
+  onSuccess?: () => void;
+}
+
+export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceiptFormProps) {
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -231,6 +235,7 @@ export default function CreateGoodsReceiptForm() {
         product_name: item.product_name || item.name || "",
         quantity: item.quantity,
         unit_price: item.unit_price || item.price || 0,
+        total_price: (item.quantity * (item.unit_price || item.price || 0))
       }));
 
       // Find supplier name
@@ -258,7 +263,11 @@ export default function CreateGoodsReceiptForm() {
       });
 
       toast.success("Đã tạo phiếu nhập hàng thành công");
-      navigate("/goods-receipt");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate("/goods-receipt");
+      }
     } catch (error) {
       console.error("Error creating goods receipt:", error);
       toast.error("Lỗi khi tạo phiếu nhập hàng");

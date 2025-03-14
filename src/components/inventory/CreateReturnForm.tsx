@@ -1,4 +1,3 @@
-
 // Import necessary libraries and components
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -65,7 +64,12 @@ const formSchema = z.object({
   notes: z.string().optional(),
 });
 
-export default function CreateReturnForm() {
+// Define props interface
+interface CreateReturnFormProps {
+  onSuccess?: () => void;
+}
+
+export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<Supplier | null>(null);
@@ -242,6 +246,7 @@ export default function CreateReturnForm() {
         product_name: item.product_name || item.name || "",
         quantity: item.quantity,
         unit_price: item.unit_price || item.price || 0,
+        total_price: (item.quantity * (item.unit_price || item.price || 0)),
         reason: item.reason || "",
       }));
 
@@ -277,7 +282,11 @@ export default function CreateReturnForm() {
       });
 
       toast.success("Đã tạo phiếu trả hàng thành công");
-      navigate("/returns");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate("/returns");
+      }
     } catch (error) {
       console.error("Error creating return:", error);
       toast.error("Lỗi khi tạo phiếu trả hàng");

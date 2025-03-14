@@ -1,5 +1,24 @@
 // Inventory models
 
+// Product model (for WooCommerce products)
+export interface Product {
+  id: number;
+  name: string;
+  slug?: string;
+  permalink?: string;
+  date_created?: string;
+  description?: string;
+  short_description?: string;
+  sku: string;
+  price: string;
+  regular_price?: string;
+  sale_price?: string;
+  stock_quantity?: number;
+  stock_status?: string;
+  categories?: Array<{id: number, name: string, slug: string}>;
+  images?: Array<{id: number, src: string, alt?: string}>;
+}
+
 // Supplier model
 export interface Supplier {
   id: number;
