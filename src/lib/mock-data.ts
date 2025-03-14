@@ -1,4 +1,3 @@
-
 import { Product, Order } from './woocommerce';
 
 export interface Customer {
@@ -467,4 +466,206 @@ export const mockInventoryByCategoryData = [
   { name: 'Váy nữ', value: 20 },
   { name: 'Giày nam', value: 15 },
   { name: 'Giày nữ', value: 18 }
+];
+
+// Mock damaged stock data
+export const mockDamagedStock = [
+  {
+    id: 1,
+    date: '2023-06-10T08:00:00',
+    product_id: 1,
+    product_name: 'Áo thun nam Harmony',
+    quantity: 5,
+    reason: 'Hư hỏng trong quá trình vận chuyển',
+    notes: 'Đã hủy sản phẩm'
+  },
+  {
+    id: 2,
+    date: '2023-06-15T10:30:00',
+    product_id: 3,
+    product_name: 'Váy nữ Wave',
+    quantity: 2,
+    reason: 'Lỗi sản xuất',
+    notes: 'Trả về nhà sản xuất'
+  },
+  {
+    id: 3,
+    date: '2023-06-20T14:15:00',
+    product_id: 5,
+    product_name: 'Quần jean nam Blue',
+    quantity: 3,
+    reason: 'Phai màu',
+    notes: 'Chuyển xuống hàng giảm giá'
+  }
+];
+
+// Mock stock adjustments
+export const mockStockAdjustments = [
+  {
+    id: 1,
+    product_id: 1,
+    product_name: 'Áo thun nam Harmony',
+    real_stock: 50,
+    virtual_stock: 47,
+    available_to_sell: 47,
+    adjustment_date: '2023-06-05T09:00:00',
+    adjusted_by: 'admin',
+    reason: 'Kiểm kê kho',
+    notes: 'Điều chỉnh theo kết quả kiểm kê quý 2'
+  },
+  {
+    id: 2,
+    product_id: 3,
+    product_name: 'Váy nữ Wave',
+    real_stock: 30,
+    virtual_stock: 28,
+    available_to_sell: 28,
+    adjustment_date: '2023-06-08T11:20:00',
+    adjusted_by: 'admin',
+    reason: 'Cập nhật tồn kho',
+    notes: 'Điều chỉnh theo số liệu thực tế'
+  }
+];
+
+// Mock customer debt data
+export const mockCustomerDebts = [
+  {
+    id: 1,
+    customer_id: 1,
+    customer_name: 'Nguyễn Văn A',
+    initial_debt: 5000000,
+    current_debt: 3000000,
+    last_updated: '2023-06-01T10:00:00',
+    notes: 'Khách hàng thân thiết'
+  },
+  {
+    id: 2,
+    customer_id: 2,
+    customer_name: 'Trần Thị B',
+    initial_debt: 2000000,
+    current_debt: 2000000,
+    last_updated: '2023-06-05T14:30:00',
+    notes: 'Chưa thanh toán đơn hàng đầu tiên'
+  }
+];
+
+// Mock goods receipts
+export const mockGoodsReceipts = [
+  {
+    id: 1,
+    receipt_id: 'GR001',
+    date: '2023-05-15T09:00:00',
+    supplier_id: 1,
+    supplier_name: 'Nhà A',
+    total_amount: 10000000,
+    payment_amount: 10000000,
+    payment_status: 'paid',
+    status: 'completed',
+    notes: 'Đã nhập kho đầy đủ',
+    created_at: '2023-05-15T09:00:00',
+    updated_at: '2023-05-15T09:00:00',
+    items: [
+      {
+        id: 1,
+        receipt_id: 1,
+        product_id: 1,
+        product_name: 'Áo thun nam Harmony',
+        quantity: 20,
+        unit_price: 150000,
+        total: 3000000
+      },
+      {
+        id: 2,
+        receipt_id: 1,
+        product_id: 3,
+        product_name: 'Váy nữ Wave',
+        quantity: 15,
+        unit_price: 200000, 
+        total: 3000000
+      }
+    ]
+  },
+  {
+    id: 2,
+    receipt_id: 'GR002',
+    date: '2023-05-20T10:30:00',
+    supplier_id: 2,
+    supplier_name: 'Thế thao số',
+    total_amount: 15000000,
+    payment_amount: 7500000,
+    payment_status: 'partial',
+    status: 'completed',
+    notes: 'Thanh toán 50%, phần còn lại trả sau 30 ngày',
+    created_at: '2023-05-20T10:30:00',
+    updated_at: '2023-05-20T10:30:00',
+    items: [
+      {
+        id: 3,
+        receipt_id: 2,
+        product_id: 5,
+        product_name: 'Quần jean nam Blue',
+        quantity: 30,
+        unit_price: 250000,
+        total: 7500000
+      }
+    ]
+  }
+];
+
+// Mock returns data
+export const mockReturns = [
+  {
+    id: 1,
+    return_id: 'R001',
+    date: '2023-06-01T11:00:00',
+    type: 'customer',
+    entity_id: 1,
+    entity_name: 'Nguyễn Văn A',
+    total_amount: 450000,
+    payment_amount: 450000,
+    payment_status: 'refunded',
+    status: 'completed',
+    notes: 'Khách hàng đổi trả do không vừa size',
+    created_at: '2023-06-01T11:00:00',
+    updated_at: '2023-06-01T11:00:00',
+    items: [
+      {
+        id: 1,
+        return_id: 1,
+        product_id: 1,
+        product_name: 'Áo thun nam Harmony',
+        quantity: 3,
+        unit_price: 150000,
+        total: 450000,
+        reason: 'Không vừa size'
+      }
+    ]
+  },
+  {
+    id: 2,
+    return_id: 'R002',
+    date: '2023-06-05T14:00:00',
+    type: 'supplier',
+    entity_id: 1,
+    entity_name: 'Nhà A',
+    total_amount: 600000,
+    payment_amount: 600000,
+    payment_status: 'refunded',
+    status: 'completed',
+    notes: 'Trả hàng cho nhà cung cấp do lỗi sản xuất',
+    created_at: '2023-06-05T14:00:00',
+    updated_at: '2023-06-05T14:00:00',
+    items: [
+      {
+        id: 2,
+        return_id: 2,
+        product_id: 3,
+        product_name: 'Váy nữ Wave',
+        quantity: 3,
+        unit_price: 200000,
+        total: 600000,
+        reason: 'Lỗi sản xuất'
+      }
+    ]
+  }
 ];

@@ -19,6 +19,7 @@ interface ApiOptions {
   method?: string;
   body?: any;
   headers?: Record<string, string>;
+  suppressToast?: boolean; // Add option to suppress toast notifications
 }
 
 /**
@@ -33,6 +34,8 @@ export async function fetchWooCommerce(endpoint: string, options: ApiOptions = {
 
     const requestUrl = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
     
+    console.log(`Fetching WooCommerce API: ${endpoint}`);
+    
     const response = await fetch(requestUrl, {
       method: options.method || 'GET',
       headers: {
@@ -43,13 +46,16 @@ export async function fetchWooCommerce(endpoint: string, options: ApiOptions = {
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`API error: ${response.status} ${response.statusText} ${errorText}`);
     }
 
     return await response.json();
   } catch (error) {
     console.error('WooCommerce API error:', error);
-    toast.error('Error fetching data from WooCommerce API');
+    if (!options.suppressToast) {
+      toast.error('Error fetching data from WooCommerce API');
+    }
     throw error;
   }
 }
@@ -62,35 +68,7 @@ export async function fetchWordPress(endpoint: string, options: ApiOptions = {})
     const url = `${WP_API_URL}${endpoint}`;
     const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
     
-    const response = await fetch(url, {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${credentials}`,
-        ...options.headers,
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('WordPress API error:', error);
-    toast.error('Error fetching data from WordPress API');
-    throw error;
-  }
-}
-
-/**
- * Fetch data from custom API
- */
-export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {}) {
-  try {
-    const url = `${CUSTOM_API_URL}${endpoint}`;
-    const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
+    console.log(`Fetching WordPress API: ${endpoint}`);
     
     const response = await fetch(url, {
       method: options.method || 'GET',
@@ -103,13 +81,55 @@ export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {})
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`API error: ${response.status} ${response.statusText} ${errorText}`);
     }
 
     return await response.json();
   } catch (error) {
+    console.error('WordPress API error:', error);
+    if (!options.suppressToast) {
+      toast.error('Error fetching data from WordPress API');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch data from custom API
+ */
+export async function fetchCustomAPI(endpoint: string, options: ApiOptions = {}) {
+  try {
+    const url = `${CUSTOM_API_URL}${endpoint}`;
+    const credentials = btoa(`${WP_USERNAME}:${APPLICATION_PASSWORD}`);
+    
+    console.log(`Fetching Custom API: ${endpoint}`);
+    
+    const response = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${credentials}`,
+        ...options.headers,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    // Log the raw response for debugging
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error(`Custom API response error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`Custom API response data:`, data);
+    return data;
+  } catch (error) {
     console.error('Custom API error:', error);
-    toast.error('Error fetching data from custom API');
+    if (!options.suppressToast) {
+      toast.error('Error fetching data from custom API');
+    }
     throw error;
   }
 }

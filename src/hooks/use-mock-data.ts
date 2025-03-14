@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -10,7 +9,12 @@ import {
   mockPaymentReceipts,
   mockRecentActivities,
   mockSalesData,
-  mockInventoryByCategoryData
+  mockInventoryByCategoryData,
+  mockDamagedStock,
+  mockStockAdjustments,
+  mockCustomerDebts,
+  mockGoodsReceipts,
+  mockReturns
 } from "@/lib/mock-data";
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
 import { normalizeProduct, normalizeVariation, Product, Variation } from "@/lib/woocommerce";
@@ -195,5 +199,111 @@ export function useGetInventoryByCategoryData() {
       return mockInventoryByCategoryData;
     },
     mockData: mockInventoryByCategoryData
+  });
+}
+
+/**
+ * Hook to get damaged stock data with fallback to mock data
+ */
+export function useGetDamagedStock() {
+  return useMockData({
+    queryKey: ['damagedStock'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/damaged-stock');
+    },
+    mockData: mockDamagedStock
+  });
+}
+
+/**
+ * Hook to get stock adjustments with fallback to mock data
+ */
+export function useGetStockAdjustments() {
+  return useMockData({
+    queryKey: ['stockAdjustments'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/stock-adjustments');
+    },
+    mockData: mockStockAdjustments
+  });
+}
+
+/**
+ * Hook to get customer debts with fallback to mock data
+ */
+export function useGetCustomerDebts() {
+  return useMockData({
+    queryKey: ['customerDebts'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/customer-debts');
+    },
+    mockData: mockCustomerDebts
+  });
+}
+
+/**
+ * Hook to get a single customer's debt with fallback to mock data
+ */
+export function useGetCustomerDebt(customerId: number) {
+  return useMockData({
+    queryKey: ['customerDebt', customerId.toString()],
+    apiFn: async () => {
+      return await fetchCustomAPI(`/customer-debts?customer_id=${customerId}`);
+    },
+    mockData: mockCustomerDebts.find(debt => debt.customer_id === customerId) || mockCustomerDebts[0]
+  });
+}
+
+/**
+ * Hook to get goods receipts with fallback to mock data
+ */
+export function useGetGoodsReceipts() {
+  return useMockData({
+    queryKey: ['goodsReceipts'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/goods-receipts');
+    },
+    mockData: mockGoodsReceipts
+  });
+}
+
+/**
+ * Hook to get a single goods receipt with fallback to mock data
+ */
+export function useGetGoodsReceipt(receiptId: number) {
+  return useMockData({
+    queryKey: ['goodsReceipt', receiptId.toString()],
+    apiFn: async () => {
+      return await fetchCustomAPI(`/goods-receipts/${receiptId}`);
+    },
+    mockData: mockGoodsReceipts.find(receipt => receipt.id === receiptId) || mockGoodsReceipts[0],
+    mockDataId: receiptId
+  });
+}
+
+/**
+ * Hook to get returns with fallback to mock data
+ */
+export function useGetReturns() {
+  return useMockData({
+    queryKey: ['returns'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/returns');
+    },
+    mockData: mockReturns
+  });
+}
+
+/**
+ * Hook to get a single return with fallback to mock data
+ */
+export function useGetReturn(returnId: number) {
+  return useMockData({
+    queryKey: ['return', returnId.toString()],
+    apiFn: async () => {
+      return await fetchCustomAPI(`/returns/${returnId}`);
+    },
+    mockData: mockReturns.find(ret => ret.id === returnId) || mockReturns[0],
+    mockDataId: returnId
   });
 }
