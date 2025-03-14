@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Plugin Name: HMM Custom API
@@ -544,7 +543,6 @@ function hmm_create_returns_table() {
 // --- Suppliers Functions ---
 function hmm_get_suppliers() {
     global $wpdb;
-    // Cập nhật tên bảng từ inventory_suppliers thành hmm_suppliers
     $table_name = $wpdb->prefix . 'hmm_suppliers';
     
     // Kiểm tra xem bảng có tồn tại không
@@ -569,7 +567,6 @@ function hmm_get_suppliers() {
 function hmm_get_supplier($request) {
     global $wpdb;
     $supplier_id = $request['id'];
-    // Cập nhật tên bảng
     $table_name = $wpdb->prefix . 'hmm_suppliers';
     
     $supplier = $wpdb->get_row(
@@ -586,7 +583,6 @@ function hmm_get_supplier($request) {
 
 function hmm_create_supplier($request) {
     global $wpdb;
-    // Cập nhật tên bảng
     $table_name = $wpdb->prefix . 'hmm_suppliers';
     
     // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
@@ -632,7 +628,6 @@ function hmm_create_supplier($request) {
 function hmm_update_supplier($request) {
     global $wpdb;
     $supplier_id = $request['id'];
-    // Cập nhật tên bảng
     $table_name = $wpdb->prefix . 'hmm_suppliers';
     
     // Kiểm tra nhà cung cấp tồn tại
@@ -686,7 +681,6 @@ function hmm_update_supplier($request) {
 function hmm_delete_supplier($request) {
     global $wpdb;
     $supplier_id = $request['id'];
-    // Cập nhật tên bảng
     $table_name = $wpdb->prefix . 'hmm_suppliers';
     
     // Kiểm tra nhà cung cấp tồn tại
@@ -720,7 +714,6 @@ function hmm_delete_supplier($request) {
 
 function hmm_create_suppliers_table() {
     global $wpdb;
-    // Cập nhật tên bảng
     $table_name = $wpdb->prefix . 'hmm_suppliers';
     $charset_collate = $wpdb->get_charset_collate();
     
@@ -803,6 +796,7 @@ function hmm_create_payment_receipt($request) {
             'reference' => $params['reference'] ?? '',
             'date' => $params['date'] ?? current_time('mysql'),
             'notes' => $params['notes'] ?? '',
+            'attachment_url' => $params['attachment_url'] ?? '',
             'created_at' => current_time('mysql')
         )
     );
@@ -816,7 +810,6 @@ function hmm_create_payment_receipt($request) {
     
     // Cập nhật nợ hiện tại của nhà cung cấp hoặc khách hàng
     if ($params['entity'] === 'supplier') {
-        // Cập nhật tên bảng supplier
         $supplier_table = $wpdb->prefix . 'hmm_suppliers';
         $supplier = $wpdb->get_row(
             $wpdb->prepare("SELECT * FROM $supplier_table WHERE id = %d", $params['entity_id']),
@@ -855,6 +848,7 @@ function hmm_create_payment_receipts_table() {
         reference varchar(100),
         date datetime DEFAULT CURRENT_TIMESTAMP,
         notes text,
+        attachment_url text,
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY  (id)
     ) $charset_collate;";
@@ -876,7 +870,7 @@ function hmm_api_status() {
     // Kiểm tra kết nối cơ sở dữ liệu
     $db_status = !empty($wpdb->last_error) ? false : true;
     
-    // Cập nhật tên bảng nhà cung cấp
+    // Kiểm tra bảng nhà cung cấp
     $suppliers_table = $wpdb->prefix . 'hmm_suppliers';
     $suppliers_exists = $wpdb->get_var("SHOW TABLES LIKE '$suppliers_table'") == $suppliers_table;
     
@@ -924,7 +918,6 @@ function hmm_activate_plugin() {
 // Thêm dữ liệu mẫu
 function hmm_add_sample_data() {
     global $wpdb;
-    // Cập nhật tên bảng nhà cung cấp
     $suppliers_table = $wpdb->prefix . 'hmm_suppliers';
     
     // Kiểm tra xem đã có dữ liệu nhà cung cấp chưa

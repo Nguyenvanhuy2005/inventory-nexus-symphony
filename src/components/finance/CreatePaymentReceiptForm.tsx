@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -151,7 +152,7 @@ export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentRec
         entity_name: data.entity_name,
         date: data.date,
         amount: parseFloat(data.amount),
-        payment_method: "cash", // Default payment method
+        payment_method: "cash" as const, // Default payment method
         description: data.description,
         status: "completed" as const,
         created_by: "Admin", // Default created by
