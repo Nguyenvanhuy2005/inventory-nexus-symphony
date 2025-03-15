@@ -37,7 +37,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useGetProductWithVariations, useUpdateProduct, useCreateProduct, useGetProductCategories } from '@/hooks/api-hooks';
 import { Product, ProductVariation } from '@/types/models';
 
-// Define the form schema using Zod
 const productFormSchema = z.object({
   name: z.string().min(2, {
     message: "Tên sản phẩm phải có ít nhất 2 ký tự.",
@@ -70,13 +69,11 @@ export default function AddEditProduct() {
 
   // Fetch product data with variations
   const productWithVariations = useGetProductWithVariations(productId);
-  const productData = productWithVariations?.data?.product || null;
+  const productData = productWithVariations.data?.product || null;
 
-  // Fetch product categories
   const { data: categoriesData } = useGetProductCategories();
   const categories = categoriesData || [];
 
-  // Initialize form with react-hook-form
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -96,7 +93,6 @@ export default function AddEditProduct() {
     mode: "onChange",
   });
 
-  // Update form default values when product data changes
   useEffect(() => {
     if (productData) {
       form.reset({
@@ -116,16 +112,13 @@ export default function AddEditProduct() {
     }
   }, [productData, form]);
 
-  // Access the updateProduct and createProduct mutations
   const updateProduct = useUpdateProduct();
   const createProduct = useCreateProduct();
 
-  // Handle form submission
   const handleSubmit = async (data: ProductFormValues) => {
     try {
       setIsSubmitting(true);
     
-      // Prepare the data for API
       const productData = {
         name: data.name,
         sku: data.sku,
@@ -142,14 +135,12 @@ export default function AddEditProduct() {
       };
     
       if (productId) {
-        // Update existing product
         await updateProduct.mutateAsync({ 
           id: parseInt(productId as string),
-          data: productData  // Make sure to use the 'data' property here
+          data: productData
         });
         navigate(`/products/${productId}`);
       } else {
-        // Create new product
         const result = await createProduct.mutateAsync(productData);
         navigate(`/products/${result.id}`);
       }
@@ -286,7 +277,6 @@ export default function AddEditProduct() {
                     <Select
                       onValueChange={(value) => field.onChange([value])}
                       defaultValue={field.value?.[0]}
-                      multiple
                     >
                       <FormControl>
                         <SelectTrigger>

@@ -63,7 +63,11 @@ export default function Settings() {
       setWpUsers(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Error:', error);
-      toast.error(error instanceof Error ? error.message : 'Unknown error occurred');
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        toast.error(error.message as string);
+      } else {
+        toast.error(String(error));
+      }
       setWpUsers([]);
     } finally {
       setIsLoadingUsers(false);
