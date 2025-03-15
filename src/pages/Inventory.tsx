@@ -7,12 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, ArrowUpDown, ExternalLink, RefreshCw, PlusCircle } from "lucide-react";
+import { Search, Filter, ArrowUpDown, RefreshCw, Info } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product } from "@/types/models";
 import { toast } from "sonner";
-import { fetchWooCommerce, fetchCustomAPI, fetchStockLevels, syncProductsWithStockLevels } from "@/lib/api-utils";
-import { Link } from "react-router-dom";
+import { fetchWooCommerce, fetchStockLevels, syncProductsWithStockLevels } from "@/lib/api-utils";
 
 // Format currency
 const formatCurrency = (value: string | undefined) => {
@@ -128,11 +127,6 @@ export default function Inventory() {
     return <Badge variant="outline" className="border-green-500 text-green-500">Còn hàng</Badge>;
   };
 
-  // Get WooCommerce product URL
-  const getWooProductUrl = (productId: number) => {
-    return `https://hmm.vn/wp-admin/post.php?post=${productId}&action=edit`;
-  };
-
   return (
     <div className="space-y-6">
       <DashboardHeader 
@@ -161,19 +155,8 @@ export default function Inventory() {
                 <RefreshCw className="h-4 w-4" />
               </Button>
               <Button variant="outline" onClick={showDataSourceInfo}>
+                <Info className="mr-2 h-4 w-4" />
                 Thông tin dữ liệu
-              </Button>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Link to="/inventory/add-product">
-                <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Thêm sản phẩm mới
-                </Button>
-              </Link>
-              <Button variant="outline" onClick={() => window.open("https://hmm.vn/wp-admin/post-new.php?post_type=product")}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                WooCommerce
               </Button>
             </div>
           </div>
@@ -191,7 +174,6 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
-                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
             <TabsContent value="instock" className="mt-4">
@@ -200,7 +182,6 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
-                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
             <TabsContent value="lowstock" className="mt-4">
@@ -209,7 +190,6 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
-                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
             <TabsContent value="outofstock" className="mt-4">
@@ -218,7 +198,6 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
-                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
           </Tabs>
@@ -233,10 +212,9 @@ interface ProductsTableProps {
   isLoading: boolean;
   hasError: boolean;
   getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => JSX.Element;
-  getWooProductUrl: (productId: number) => string;
 }
 
-function ProductsTable({ products, isLoading, hasError, getStockStatusBadge, getWooProductUrl }: ProductsTableProps) {
+function ProductsTable({ products, isLoading, hasError, getStockStatusBadge }: ProductsTableProps) {
   if (hasError) {
     return (
       <div className="py-12 text-center">
@@ -273,13 +251,12 @@ function ProductsTable({ products, isLoading, hasError, getStockStatusBadge, get
           </TableHead>
           <TableHead>Giá</TableHead>
           <TableHead>Trạng thái</TableHead>
-          <TableHead className="text-right">Thao tác</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {isLoading ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center">
+            <TableCell colSpan={7} className="text-center">
               <div className="flex items-center justify-center py-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
               </div>
@@ -287,7 +264,7 @@ function ProductsTable({ products, isLoading, hasError, getStockStatusBadge, get
           </TableRow>
         ) : products?.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center">
+            <TableCell colSpan={7} className="text-center">
               Không tìm thấy sản phẩm nào
             </TableCell>
           </TableRow>
@@ -312,20 +289,6 @@ function ProductsTable({ products, isLoading, hasError, getStockStatusBadge, get
               <TableCell>{product.available_to_sell !== undefined ? product.available_to_sell : product.stock_quantity || 0}</TableCell>
               <TableCell>{formatCurrency(product.price)}</TableCell>
               <TableCell>{getStockStatusBadge(product)}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end space-x-2">
-                  <Link to={`/inventory/product/${product.id}`}>
-                    <Button variant="ghost" size="sm">
-                      Sửa
-                    </Button>
-                  </Link>
-                  <a href={getWooProductUrl(product.id)} target="_blank" rel="noopener noreferrer">
-                    <Button variant="ghost" size="sm">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </a>
-                </div>
-              </TableCell>
             </TableRow>
           ))
         )}
