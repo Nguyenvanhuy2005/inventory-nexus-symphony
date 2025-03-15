@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 
 // API base URLs with fallbacks that will work in browser environment
@@ -17,6 +18,19 @@ export const mockWooCommerceData = {
   users: [
     { id: 1, name: "Admin User", email: "admin@example.com" },
     { id: 2, name: "Manager", email: "manager@example.com" }
+  ],
+  stockTransactions: [
+    { 
+      id: 1, 
+      product_id: 1, 
+      product_name: "Sample Product 1", 
+      transaction_type: "adjustment", 
+      quantity: 5, 
+      previous_stock: 5, 
+      new_stock: 10, 
+      notes: "Điều chỉnh tồn kho",
+      created_at: new Date().toISOString()
+    }
   ]
 };
 
@@ -90,6 +104,18 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     if (!options.suppressToast && options.method && options.method !== 'GET') {
       toast.error(`Lỗi API: ${error instanceof Error ? error.message : 'Không thể kết nối tới máy chủ'}`);
     }
+    
+    // Mock data for development
+    if (endpoint === '/stock-transactions' && options.method === 'GET') {
+      return {
+        transactions: mockWooCommerceData.stockTransactions,
+        total: mockWooCommerceData.stockTransactions.length,
+        page: 1,
+        per_page: 100,
+        total_pages: 1
+      };
+    }
+    
     throw error;
   }
 }
@@ -345,4 +371,26 @@ export function syncProductsWithStockLevels(products, stockLevels) {
         : (product.stock_quantity || 0) - (product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0)
     };
   });
+}
+
+/**
+ * Get transaction type display name for UI
+ * @param type Transaction type from database
+ * @returns Human-readable transaction type in Vietnamese
+ */
+export function getTransactionTypeDisplay(type: string): string {
+  const types = {
+    'initialization': 'Khởi tạo tồn kho',
+    'adjustment': 'Điều chỉnh tồn kho',
+    'goods_receipt': 'Nhập hàng',
+    'return': 'Trả hàng',
+    'damaged': 'Hàng hỏng',
+    'sync': 'Đồng bộ tồn kho',
+    'order_processing': 'Đơn hàng xử lý',
+    'order_completed': 'Đơn hàng hoàn thành',
+    'order_cancelled': 'Đơn hàng bị hủy',
+    'order_cancelled_restore_stock': 'Hoàn trả tồn kho'
+  };
+  
+  return types[type] || type;
 }

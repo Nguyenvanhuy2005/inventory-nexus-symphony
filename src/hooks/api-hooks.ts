@@ -14,7 +14,9 @@ import {
   PurchaseOrder,
   StockEntry,
   Product,
-  ProductVariation
+  ProductVariation,
+  StockTransaction,
+  StockSyncResult
 } from "@/types/models";
 
 // --- API Status ---
@@ -300,7 +302,7 @@ export function useCreateStockAdjustment() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (stockAdjustment: Omit<StockAdjustment, 'id'>) => {
+    mutationFn: async (stockAdjustment: Omit<StockAdjustment, 'id' | 'previous_quantity' | 'new_quantity'>) => {
       return await fetchCustomAPI('/stock-adjustments', {
         method: 'POST',
         body: stockAdjustment
@@ -310,6 +312,7 @@ export function useCreateStockAdjustment() {
       queryClient.invalidateQueries({ queryKey: ['stockAdjustments'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
+      queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
       toast.success('Điều chỉnh tồn kho đã được tạo thành công');
     },
     onError: (error) => {
@@ -376,11 +379,66 @@ export function useCreateStockLevel() {
       queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
       queryClient.invalidateQueries({ queryKey: ['stockLevel', variables.product_id.toString()] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
       toast.success('Tồn kho đã được tạo thành công');
     },
     onError: (error) => {
       console.error('Error creating stock level:', error);
       toast.error('Không thể tạo tồn kho: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
+// --- Stock Transactions ---
+export function useGetStockTransactions() {
+  return useQuery({
+    queryKey: ['stockTransactions'],
+    queryFn: async () => {
+      return await fetchCustomAPI('/stock-transactions') as {
+        transactions: StockTransaction[],
+        total: number,
+        page: number,
+        per_page: number,
+        total_pages: number
+      };
+    }
+  });
+}
+
+export function useGetProductStockTransactions(productId: number) {
+  return useQuery({
+    queryKey: ['stockTransactions', productId.toString()],
+    queryFn: async () => {
+      return await fetchCustomAPI(`/stock-transactions/${productId}`) as {
+        product_id: number,
+        product_name: string,
+        transactions: StockTransaction[]
+      };
+    },
+    enabled: !!productId
+  });
+}
+
+// --- Stock Sync ---
+export function useSyncProductsStock() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (products: { product_id: number }[]) => {
+      return await fetchCustomAPI('/stock-management/sync', {
+        method: 'POST',
+        body: { products }
+      }) as StockSyncResult;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockTransactions'] });
+      toast.success('Sản phẩm đã được đồng bộ với tồn kho thành công');
+    },
+    onError: (error) => {
+      console.error('Error syncing products with stock:', error);
+      toast.error('Không thể đồng bộ sản phẩm với tồn kho: ' + (error instanceof Error ? error.message : ''));
     }
   });
 }

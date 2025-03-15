@@ -56,6 +56,8 @@ export interface GoodsReceipt {
   status: string;
   notes: string;
   items: GoodsReceiptItem[];
+  affects_stock?: boolean;
+  sync_status?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -88,6 +90,8 @@ export interface Return {
   status: string;
   notes: string;
   items: ReturnItem[];
+  affects_stock?: boolean;
+  sync_status?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -100,6 +104,8 @@ export interface DamagedStock {
   reason: string;
   date: string;
   notes: string;
+  sync_status?: string;
+  processed?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -109,6 +115,7 @@ export interface StockAdjustment {
   product_id: number;
   product_name: string;
   quantity_change: number;
+  previous_quantity: number;
   new_quantity: number;
   reason: string;
   date: string;
@@ -205,4 +212,44 @@ export interface ProductVariation {
   real_stock?: number;
   pending_orders?: number;
   available_to_sell?: number;
+}
+
+export interface StockTransaction {
+  id: number;
+  product_id: number;
+  product_name?: string;
+  transaction_type: string;
+  quantity: number;
+  previous_stock: number;
+  new_stock: number;
+  reference_id?: number;
+  reference_type?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface StockSyncLog {
+  id: number;
+  action: string;
+  status: string;
+  details?: string;
+  created_at: string;
+}
+
+export interface StockSyncResult {
+  synced: Array<{
+    product_id: number;
+    product_name: string;
+    stock_quantity: number;
+  }>;
+  failed: Array<{
+    product_id: number|null;
+    product_name?: string;
+    error: string;
+  }>;
+  skipped: Array<{
+    product_id: number;
+    product_name: string;
+    reason: string;
+  }>;
 }
