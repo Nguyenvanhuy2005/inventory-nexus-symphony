@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useGetProducts } from "@/hooks/use-mock-data";
 import { useGetStockLevels } from "@/hooks/api-hooks";
 import { Button } from "@/components/ui/button";
@@ -8,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, ArrowUpDown } from "lucide-react";
+import { Search, Plus, Filter, ArrowUpDown, Eye, RefreshCw } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product } from "@/lib/woocommerce";
+import { toast } from "sonner";
 
 // Format currency
 const formatCurrency = (value: string | undefined) => {
@@ -23,6 +25,7 @@ const formatCurrency = (value: string | undefined) => {
 };
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const { data: products, isLoading: isLoadingProducts } = useGetProducts();
   const { data: stockLevels, isLoading: isLoadingStockLevels } = useGetStockLevels();
   const [tab, setTab] = useState("all");
@@ -33,8 +36,14 @@ export default function Inventory() {
     const stockLevel = stockLevels?.find(sl => sl.product_id === product.id);
     return {
       ...product,
-      real_stock: stockLevel?.ton_thuc_te || product.stock_quantity,
-      available_to_sell: stockLevel?.co_the_ban || product.stock_quantity
+      // Tồn kho thực tế: lấy từ bảng hmm_stock_levels nếu có, không thì lấy từ WooCommerce
+      real_stock: stockLevel?.ton_thuc_te !== undefined ? stockLevel.ton_thuc_te : product.stock_quantity,
+      // Đơn đang xử lý: số lượng đặt hàng đang chờ xử lý, lấy từ meta_data hoặc mặc định là 0
+      pending_orders: product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0,
+      // Có thể bán: lấy từ bảng hmm_stock_levels nếu có, không thì tính bằng tồn kho - đơn đang xử lý
+      available_to_sell: stockLevel?.co_the_ban !== undefined 
+        ? stockLevel.co_the_ban 
+        : (product.stock_quantity || 0) - (product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0)
     };
   });
   
@@ -49,7 +58,8 @@ export default function Inventory() {
     if (tab === "outofstock") return product.stock_status === "outofstock" && matchesSearch;
     if (tab === "lowstock") {
       return product.stock_status === "instock" && 
-        (product.real_stock <= 5 || product.available_to_sell <= 5) && 
+        ((product.real_stock !== undefined && product.real_stock <= 5) || 
+         (product.available_to_sell !== undefined && product.available_to_sell <= 5)) && 
         matchesSearch;
     }
     return matchesSearch;
@@ -57,8 +67,27 @@ export default function Inventory() {
   
   const isLoading = isLoadingProducts || isLoadingStockLevels;
   
+  // Navigate to add new product
+  const handleAddNewProduct = () => {
+    navigate("/inventory/add");
+  };
+
+  // Show detailed explanation of data
+  const showDataSourceInfo = () => {
+    toast.info(
+      <div className="space-y-2">
+        <p className="font-medium">Nguồn dữ liệu tồn kho:</p>
+        <ul className="list-disc pl-5 text-sm">
+          <li><strong>Tồn kho thực tế:</strong> Lấy từ bảng <code>hmm_stock_levels</code> trong trường <code>ton_thuc_te</code>. Nếu không có, sẽ dùng <code>stock_quantity</code> từ WooCommerce.</li>
+          <li><strong>Đơn đang xử lý:</strong> Số lượng sản phẩm đang trong đơn hàng chưa hoàn thành. Lấy từ trường <code>meta_data</code> với key <code>pending_orders</code>.</li>
+          <li><strong>Có thể bán:</strong> Lấy từ bảng <code>hmm_stock_levels</code> trong trường <code>co_the_ban</code>. Nếu không có, sẽ tính bằng công thức: <code>Tồn kho thực tế - Đơn đang xử lý</code>.</li>
+        </ul>
+      </div>
+    );
+  };
+  
   // Generate stock status badge
-  const getStockStatusBadge = (product: Product & { real_stock?: number, available_to_sell?: number }) => {
+  const getStockStatusBadge = (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => {
     if (product.stock_status === "outofstock") {
       return <Badge variant="outline" className="border-red-500 text-red-500">Hết hàng</Badge>;
     }
@@ -92,8 +121,11 @@ export default function Inventory() {
               <Button variant="outline" size="icon">
                 <Filter className="h-4 w-4" />
               </Button>
+              <Button variant="outline" size="icon" onClick={showDataSourceInfo}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
-            <Button className="shrink-0">
+            <Button className="shrink-0" onClick={handleAddNewProduct}>
               <Plus className="mr-2 h-4 w-4" />
               Sản phẩm mới
             </Button>
@@ -142,9 +174,9 @@ export default function Inventory() {
 }
 
 interface ProductsTableProps {
-  products: (Product & { real_stock?: number, available_to_sell?: number })[] | undefined;
+  products: (Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number })[] | undefined;
   isLoading: boolean;
-  getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number }) => JSX.Element;
+  getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => JSX.Element;
 }
 
 function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTableProps) {
@@ -208,15 +240,25 @@ function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTab
                   <span>{product.name}</span>
                 </div>
               </TableCell>
-              <TableCell>{product.real_stock || product.stock_quantity || 0}</TableCell>
+              <TableCell>{product.real_stock !== undefined ? product.real_stock : product.stock_quantity || 0}</TableCell>
               <TableCell>{product.pending_orders || 0}</TableCell>
-              <TableCell>{product.available_to_sell || product.stock_quantity || 0}</TableCell>
+              <TableCell>{product.available_to_sell !== undefined ? product.available_to_sell : product.stock_quantity || 0}</TableCell>
               <TableCell>{formatCurrency(product.price)}</TableCell>
               <TableCell>{getStockStatusBadge(product)}</TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="sm">
-                  Cập nhật
-                </Button>
+                <div className="flex justify-end space-x-2">
+                  <Link to={`/inventory/product/${product.id}`}>
+                    <Button variant="ghost" size="sm">
+                      <Eye className="mr-1 h-4 w-4" />
+                      Chi tiết
+                    </Button>
+                  </Link>
+                  <Link to={`/inventory/edit/${product.id}`}>
+                    <Button variant="ghost" size="sm">
+                      Cập nhật
+                    </Button>
+                  </Link>
+                </div>
               </TableCell>
             </TableRow>
           ))

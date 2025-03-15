@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchCustomAPI, checkAPIStatus } from "@/lib/api-utils";
@@ -12,7 +11,9 @@ import {
   CustomerDebt,
   StockLevel,
   PurchaseOrder,
-  StockEntry
+  StockEntry,
+  Product,
+  ProductVariation
 } from "@/types/models";
 
 // --- API Status ---
@@ -360,6 +361,29 @@ export function useUpdateStockLevel() {
   });
 }
 
+export function useCreateStockLevel() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (stockLevel: StockLevel) => {
+      return await fetchCustomAPI(`/stock-levels`, {
+        method: 'POST',
+        body: stockLevel
+      }) as StockLevel;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevel', variables.product_id.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Tồn kho đã được tạo thành công');
+    },
+    onError: (error) => {
+      console.error('Error creating stock level:', error);
+      toast.error('Không thể tạo tồn kho: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
 // --- Customer Debts ---
 export function useGetCustomerDebts() {
   return useQuery({
@@ -377,5 +401,144 @@ export function useGetCustomerDebt(customerId: number) {
       return await fetchCustomAPI(`/customer-debts?customer_id=${customerId}`) as CustomerDebt;
     },
     enabled: !!customerId
+  });
+}
+
+// New hooks for Product management
+export function useGetProductWithVariations(productId: number) {
+  const { data: product, isLoading, error } = useQuery({
+    queryKey: ['product', productId.toString()],
+    queryFn: async () => {
+      return await fetchWooCommerce(`/products/${productId}`) as Product;
+    },
+    enabled: !!productId
+  });
+
+  const { data: variations, isLoading: isLoadingVariations } = useQuery({
+    queryKey: ['variations', productId.toString()],
+    queryFn: async () => {
+      return await fetchWooCommerce(`/products/${productId}/variations`) as ProductVariation[];
+    },
+    enabled: !!productId
+  });
+
+  const { data: stockLevel } = useGetStockLevel(productId);
+
+  return {
+    product: product ? {
+      ...product,
+      real_stock: stockLevel?.ton_thuc_te || product.stock_quantity,
+      available_to_sell: stockLevel?.co_the_ban || product.stock_quantity
+    } : undefined,
+    variations,
+    isLoading: isLoading || isLoadingVariations,
+    error
+  };
+}
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (productData: Partial<Product>) => {
+      return await fetchWooCommerce('/products', {
+        method: 'POST',
+        body: productData
+      }) as Product;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Sản phẩm đã được tạo thành công');
+    },
+    onError: (error) => {
+      console.error('Error creating product:', error);
+      toast.error('Không thể tạo sản phẩm: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Product> & { id: number }) => {
+      return await fetchWooCommerce(`/products/${id}`, {
+        method: 'PUT',
+        body: data
+      }) as Product;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', variables.id.toString()] });
+      toast.success('Sản phẩm đã được cập nhật thành công');
+    },
+    onError: (error) => {
+      console.error('Error updating product:', error);
+      toast.error('Không thể cập nhật sản phẩm: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
+export function useCreateProductVariation() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ productId, data }: { productId: number, data: Partial<ProductVariation> }) => {
+      return await fetchWooCommerce(`/products/${productId}/variations`, {
+        method: 'POST',
+        body: data
+      }) as ProductVariation;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', variables.productId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['variations', variables.productId.toString()] });
+      toast.success('Biến thể sản phẩm đã được tạo thành công');
+    },
+    onError: (error) => {
+      console.error('Error creating product variation:', error);
+      toast.error('Không thể tạo biến thể sản phẩm: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
+export function useUpdateProductVariation() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ productId, variationId, data }: { productId: number, variationId: number, data: Partial<ProductVariation> }) => {
+      return await fetchWooCommerce(`/products/${productId}/variations/${variationId}`, {
+        method: 'PUT',
+        body: data
+      }) as ProductVariation;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', variables.productId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['variations', variables.productId.toString()] });
+      toast.success('Biến thể sản phẩm đã được cập nhật thành công');
+    },
+    onError: (error) => {
+      console.error('Error updating product variation:', error);
+      toast.error('Không thể cập nhật biến thể sản phẩm: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
+export function useGetProductCategories() {
+  return useQuery({
+    queryKey: ['productCategories'],
+    queryFn: async () => {
+      return await fetchWooCommerce('/products/categories?per_page=100') as Array<{id: number, name: string}>;
+    }
+  });
+}
+
+export function useGetProductAttributes() {
+  return useQuery({
+    queryKey: ['productAttributes'],
+    queryFn: async () => {
+      return await fetchWooCommerce('/products/attributes?per_page=100') as Array<{id: number, name: string, slug: string}>;
+    }
   });
 }

@@ -128,14 +128,14 @@ export interface CustomerDebt {
   updated_at?: string;
 }
 
-// Product interface
+// Make Product interface match the woocommerce.ts definition
 export interface Product {
   id: number;
   name: string;
-  sku: string;
+  sku?: string;
   price: string;
-  regular_price: string;
-  sale_price: string;
+  regular_price?: string;
+  sale_price?: string;
   stock_quantity?: number;
   stock_status?: string;
   categories?: Array<{id: number, name: string}>;
@@ -146,9 +146,13 @@ export interface Product {
   short_description?: string;
   type?: string;
   manage_stock?: boolean;
+  meta_data?: Array<{key: string, value: any}>;
+  real_stock?: number;
+  pending_orders?: number;
+  available_to_sell?: number;
 }
 
-// New interfaces for stock management
+// Stock interfaces for stock management
 export interface StockLevel {
   product_id: number;
   ton_thuc_te: number;
@@ -171,4 +175,37 @@ export interface StockEntry {
   quantity: number;
   cost_price: number;
   created_at: string;
+}
+
+// ProductAttribute interface for product attributes
+export interface ProductAttribute {
+  id: number;
+  name: string;
+  options: string[];
+  position: number;
+  visible: boolean;
+  variation: boolean;
+}
+
+// ProductVariation interface for product variations
+export interface ProductVariation {
+  id: number;
+  product_id: number;
+  sku?: string;
+  price: string;
+  regular_price?: string;
+  sale_price?: string;
+  stock_quantity?: number;
+  stock_status?: string;
+  attributes: {
+    name: string;
+    option: string;
+  }[];
+  image?: {
+    id: number;
+    src: string;
+  };
+  real_stock?: number;
+  pending_orders?: number;
+  available_to_sell?: number;
 }
