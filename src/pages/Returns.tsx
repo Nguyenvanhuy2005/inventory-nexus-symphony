@@ -1,19 +1,20 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, FileDown, AlertTriangle, Eye } from "lucide-react";
+import { Search, Plus, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate, formatCurrency } from "@/lib/utils";
-import { useGetReturns, useCreateReturn } from "@/hooks/api-hooks";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { formatDate } from "@/lib/utils";
+import { useGetReturns } from "@/hooks/api-hooks";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { exportToCSV } from "@/lib/api-utils";
 import CreateReturnForm from "@/components/inventory/CreateReturnForm";
 import { toast } from "sonner";
+import ReturnsTable from "@/components/returns/ReturnsTable";
 
 export default function Returns() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function Returns() {
   const [selectedReturnId, setSelectedReturnId] = useState<number | null>(null);
   
   // Get returns data
-  const { data: returns = [], isLoading, isError } = useGetReturns();
+  const { data: returns = [], isLoading, isError, refetch } = useGetReturns();
   
   // Filter returns based on search term and tab
   const filteredReturns = returns.filter(item => {
@@ -93,6 +94,12 @@ export default function Returns() {
     // Export to CSV
     exportToCSV('phieu-tra-hang', reportData);
   };
+
+  // Handle after successful creation
+  const handleCreateSuccess = () => {
+    setOpenDialog(false);
+    refetch();
+  };
   
   return (
     <div className="space-y-6">
@@ -128,11 +135,8 @@ export default function Returns() {
               <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
                   <DialogTitle>Tạo phiếu trả hàng mới</DialogTitle>
-                  <DialogDescription>
-                    Nhập thông tin phiếu trả hàng từ khách hàng hoặc trả hàng cho nhà cung cấp
-                  </DialogDescription>
                 </DialogHeader>
-                <CreateReturnForm onSuccess={() => setOpenDialog(false)} />
+                <CreateReturnForm onSuccess={handleCreateSuccess} />
               </DialogContent>
             </Dialog>
           </div>
@@ -152,7 +156,7 @@ export default function Returns() {
               isError={isError}
               getStatusBadge={getStatusBadge}
               getTypeBadge={getTypeBadge}
-              onRetry={() => navigate(0)}
+              onRetry={() => refetch()}
               onViewReturn={handleViewReturn}
             />
           </TabsContent>
@@ -164,7 +168,7 @@ export default function Returns() {
               isError={isError}
               getStatusBadge={getStatusBadge}
               getTypeBadge={getTypeBadge}
-              onRetry={() => navigate(0)}
+              onRetry={() => refetch()}
               onViewReturn={handleViewReturn}
             />
           </TabsContent>
@@ -176,7 +180,7 @@ export default function Returns() {
               isError={isError}
               getStatusBadge={getStatusBadge}
               getTypeBadge={getTypeBadge}
-              onRetry={() => navigate(0)}
+              onRetry={() => refetch()}
               onViewReturn={handleViewReturn}
             />
           </TabsContent>
@@ -201,102 +205,6 @@ export default function Returns() {
           </DialogContent>
         </Dialog>
       )}
-    </div>
-  );
-}
-
-// Table component for Returns
-interface ReturnsTableProps {
-  returns: any[];
-  isLoading: boolean;
-  isError: boolean;
-  getStatusBadge: (status: string) => JSX.Element;
-  getTypeBadge: (type: string) => JSX.Element;
-  onRetry: () => void;
-  onViewReturn: (id: number) => void;
-}
-
-function ReturnsTable({ 
-  returns, 
-  isLoading, 
-  isError, 
-  getStatusBadge, 
-  getTypeBadge,
-  onRetry,
-  onViewReturn
-}: ReturnsTableProps) {
-  if (isLoading) {
-    return (
-      <div className="mt-8 flex items-center justify-center">
-        <p>Đang tải dữ liệu...</p>
-      </div>
-    );
-  }
-  
-  if (isError) {
-    return (
-      <div className="mt-8 flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
-        <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
-        <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
-        <p className="text-muted-foreground mt-1 mb-4">
-          Đã xảy ra lỗi khi tải dữ liệu trả hàng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
-        </p>
-        <Button variant="outline" onClick={onRetry}>
-          Thử lại
-        </Button>
-      </div>
-    );
-  }
-  
-  if (returns.length === 0) {
-    return (
-      <div className="mt-8 flex items-center justify-center p-8 border border-dashed rounded-lg">
-        <div className="text-center">
-          <h3 className="text-lg font-medium">Chưa có phiếu trả hàng</h3>
-          <p className="text-muted-foreground mt-1">
-            Tạo phiếu trả hàng mới để quản lý việc trả hàng
-          </p>
-        </div>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Mã phiếu</TableHead>
-            <TableHead>Ngày</TableHead>
-            <TableHead>Loại</TableHead>
-            <TableHead>Tên đối tác</TableHead>
-            <TableHead>Tổng tiền</TableHead>
-            <TableHead>Trạng thái</TableHead>
-            <TableHead className="text-right">Thao tác</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {returns.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell className="font-medium">{item.return_id}</TableCell>
-              <TableCell>{formatDate(item.date)}</TableCell>
-              <TableCell>{getTypeBadge(item.type)}</TableCell>
-              <TableCell>{item.entity_name}</TableCell>
-              <TableCell>{formatCurrency(item.total_amount.toString())}</TableCell>
-              <TableCell>{getStatusBadge(item.status)}</TableCell>
-              <TableCell className="text-right">
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => onViewReturn(item.id)}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
     </div>
   );
 }

@@ -5,17 +5,18 @@ import {
   mockVariations,
   mockOrders,
   mockCustomers,
-  mockSuppliers,
-  mockPaymentReceipts,
   mockRecentActivities,
   mockSalesData,
   mockInventoryByCategoryData,
-  mockDamagedStock,
-  mockStockAdjustments,
   mockCustomerDebts,
-  mockGoodsReceipts,
-  mockReturns
+  mockStockAdjustments,
 } from "@/lib/mock-data";
+import { mockSuppliers } from "@/lib/mock-data-suppliers";
+import { mockGoodsReceipts } from "@/lib/mock-data-goods-receipts";
+import { mockReturns } from "@/lib/mock-data-returns";
+import { mockPaymentReceipts } from "@/lib/mock-data-payment-receipts";
+import { mockDamagedStock } from "@/lib/mock-data";
+
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
 import { normalizeProduct, normalizeVariation, Product, Variation } from "@/lib/woocommerce";
 
@@ -132,32 +133,6 @@ export function useGetCustomers() {
 }
 
 /**
- * Hook to get suppliers with fallback to mock data
- */
-export function useGetSuppliers() {
-  return useMockData({
-    queryKey: ['suppliers'],
-    apiFn: async () => {
-      return await fetchCustomAPI('/suppliers');
-    },
-    mockData: mockSuppliers
-  });
-}
-
-/**
- * Hook to get payment receipts with fallback to mock data
- */
-export function useGetPaymentReceipts() {
-  return useMockData({
-    queryKey: ['paymentReceipts'],
-    apiFn: async () => {
-      return await fetchCustomAPI('/payment-receipts');
-    },
-    mockData: mockPaymentReceipts
-  });
-}
-
-/**
  * Hook to get recent activities for dashboard
  */
 export function useGetRecentActivities() {
@@ -203,54 +178,15 @@ export function useGetInventoryByCategoryData() {
 }
 
 /**
- * Hook to get damaged stock data with fallback to mock data
+ * Hook to get suppliers with fallback to mock data
  */
-export function useGetDamagedStock() {
+export function useGetSuppliers() {
   return useMockData({
-    queryKey: ['damagedStock'],
+    queryKey: ['suppliers'],
     apiFn: async () => {
-      return await fetchCustomAPI('/damaged-stock');
+      return await fetchCustomAPI('/suppliers');
     },
-    mockData: mockDamagedStock
-  });
-}
-
-/**
- * Hook to get stock adjustments with fallback to mock data
- */
-export function useGetStockAdjustments() {
-  return useMockData({
-    queryKey: ['stockAdjustments'],
-    apiFn: async () => {
-      return await fetchCustomAPI('/stock-adjustments');
-    },
-    mockData: mockStockAdjustments
-  });
-}
-
-/**
- * Hook to get customer debts with fallback to mock data
- */
-export function useGetCustomerDebts() {
-  return useMockData({
-    queryKey: ['customerDebts'],
-    apiFn: async () => {
-      return await fetchCustomAPI('/customer-debts');
-    },
-    mockData: mockCustomerDebts
-  });
-}
-
-/**
- * Hook to get a single customer's debt with fallback to mock data
- */
-export function useGetCustomerDebt(customerId: number) {
-  return useMockData({
-    queryKey: ['customerDebt', customerId.toString()],
-    apiFn: async () => {
-      return await fetchCustomAPI(`/customer-debts?customer_id=${customerId}`);
-    },
-    mockData: mockCustomerDebts.find(debt => debt.customer_id === customerId) || mockCustomerDebts[0]
+    mockData: mockSuppliers
   });
 }
 
@@ -305,5 +241,58 @@ export function useGetReturn(returnId: number) {
     },
     mockData: mockReturns.find(ret => ret.id === returnId) || mockReturns[0],
     mockDataId: returnId
+  });
+}
+
+/**
+ * Hook to get payment receipts with fallback to mock data
+ */
+export function useGetPaymentReceipts() {
+  return useMockData({
+    queryKey: ['paymentReceipts'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/payment-receipts');
+    },
+    mockData: mockPaymentReceipts
+  });
+}
+
+/**
+ * Hook to get a single payment receipt with fallback to mock data
+ */
+export function useGetPaymentReceipt(receiptId: number) {
+  return useMockData({
+    queryKey: ['paymentReceipt', receiptId.toString()],
+    apiFn: async () => {
+      return await fetchCustomAPI(`/payment-receipts/${receiptId}`);
+    },
+    mockData: mockPaymentReceipts.find(receipt => receipt.id === receiptId) || mockPaymentReceipts[0],
+    mockDataId: receiptId
+  });
+}
+
+/**
+ * Hook to get damaged stock data with fallback to mock data
+ */
+export function useGetDamagedStock() {
+  return useMockData({
+    queryKey: ['damagedStock'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/damaged-stock');
+    },
+    mockData: mockDamagedStock
+  });
+}
+
+/**
+ * Hook to get stock adjustments with fallback to mock data
+ */
+export function useGetStockAdjustments() {
+  return useMockData({
+    queryKey: ['stockAdjustments'],
+    apiFn: async () => {
+      return await fetchCustomAPI('/stock-adjustments');
+    },
+    mockData: mockStockAdjustments
   });
 }

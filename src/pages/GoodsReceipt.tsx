@@ -4,17 +4,16 @@ import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, FileDown, AlertTriangle, Eye } from "lucide-react";
+import { Search, Plus, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { formatDate, formatCurrency } from "@/lib/utils";
 import { useGetGoodsReceipts, useCreateGoodsReceipt } from "@/hooks/api-hooks";
 import { useGetSuppliers } from "@/hooks/use-mock-data";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { exportToCSV } from "@/lib/api-utils";
 import CreateGoodsReceiptForm from "@/components/inventory/CreateGoodsReceiptForm";
 import { toast } from "sonner";
+import GoodsReceiptsTable from "@/components/goods-receipts/GoodsReceiptsTable";
+import { GoodsReceipt as GoodsReceiptType } from "@/types/models";
 
 export default function GoodsReceipt() {
   const navigate = useNavigate();
@@ -23,7 +22,7 @@ export default function GoodsReceipt() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   
   // Get goods receipts data
-  const { data: goodsReceipts = [], isLoading, isError } = useGetGoodsReceipts();
+  const { data: goodsReceipts = [], isLoading, isError, refetch } = useGetGoodsReceipts();
   
   // Filter goods receipts based on search term
   const filteredReceipts = goodsReceipts.filter(item => 
@@ -31,34 +30,6 @@ export default function GoodsReceipt() {
     item.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  // Get badge color based on status
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'completed':
-        return <Badge className="bg-green-500">Hoàn thành</Badge>;
-      case 'pending':
-        return <Badge className="bg-yellow-500">Chờ xử lý</Badge>;
-      case 'cancelled':
-        return <Badge className="bg-red-500">Đã hủy</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-  
-  // Get payment status badge
-  const getPaymentBadge = (status: string) => {
-    switch(status) {
-      case 'paid':
-        return <Badge className="bg-green-500">Đã thanh toán</Badge>;
-      case 'partial':
-        return <Badge className="bg-yellow-500">Một phần</Badge>;
-      case 'pending':
-        return <Badge className="bg-gray-500">Chờ thanh toán</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   const handleCreateReceipt = () => {
     // Show dialog for creating new goods receipt
     setOpenDialog(true);
@@ -78,7 +49,7 @@ export default function GoodsReceipt() {
     // Format data for CSV export
     const reportData = filteredReceipts.map(receipt => ({
       'Mã phiếu': receipt.receipt_id,
-      'Ngày': formatDate(receipt.date),
+      'Ngày': receipt.date,
       'Nhà cung cấp': receipt.supplier_name,
       'Tổng tiền': receipt.total_amount,
       'Đã thanh toán': receipt.payment_amount,
@@ -97,6 +68,7 @@ export default function GoodsReceipt() {
   // Handle after successful creation
   const handleCreateSuccess = () => {
     setOpenDialog(false);
+    refetch();
   };
   
   return (
@@ -133,9 +105,6 @@ export default function GoodsReceipt() {
               <DialogContent className="sm:max-w-[800px]">
                 <DialogHeader>
                   <DialogTitle>Tạo phiếu nhập hàng mới</DialogTitle>
-                  <DialogDescription>
-                    Nhập thông tin phiếu nhập hàng từ nhà cung cấp
-                  </DialogDescription>
                 </DialogHeader>
                 <CreateGoodsReceiptForm onSuccess={handleCreateSuccess} />
               </DialogContent>
@@ -143,74 +112,13 @@ export default function GoodsReceipt() {
           </div>
         </div>
         
-        {isLoading ? (
-          <div className="mt-8 flex items-center justify-center">
-            <p>Đang tải dữ liệu...</p>
-          </div>
-        ) : isError ? (
-          <div className="mt-8 flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
-            <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
-            <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
-            <p className="text-muted-foreground mt-1 mb-4">
-              Đã xảy ra lỗi khi tải dữ liệu nhập hàng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
-            </p>
-            <Button variant="outline" onClick={() => navigate(0)}>
-              Thử lại
-            </Button>
-          </div>
-        ) : filteredReceipts.length > 0 ? (
-          <div className="mt-6 rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Mã phiếu</TableHead>
-                  <TableHead>Ngày</TableHead>
-                  <TableHead>Nhà cung cấp</TableHead>
-                  <TableHead>Tổng tiền</TableHead>
-                  <TableHead>Đã thanh toán</TableHead>
-                  <TableHead>Trạng thái TT</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReceipts.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.receipt_id}</TableCell>
-                    <TableCell>{formatDate(item.date)}</TableCell>
-                    <TableCell>{item.supplier_name}</TableCell>
-                    <TableCell>{formatCurrency(item.total_amount.toString())}</TableCell>
-                    <TableCell>{formatCurrency(item.payment_amount.toString())}</TableCell>
-                    <TableCell>
-                      {getPaymentBadge(item.payment_status)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(item.status)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleViewReceipt(item.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="mt-8 flex items-center justify-center p-8 border border-dashed rounded-lg">
-            <div className="text-center">
-              <h3 className="text-lg font-medium">Chưa có phiếu nhập hàng</h3>
-              <p className="text-muted-foreground mt-1">
-                Tạo phiếu nhập hàng mới để quản lý việc nhập hàng từ nhà cung cấp
-              </p>
-            </div>
-          </div>
-        )}
+        <GoodsReceiptsTable
+          goodsReceipts={filteredReceipts as GoodsReceiptType[]}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => navigate(0)}
+          onViewReceipt={handleViewReceipt}
+        />
       </Card>
 
       {/* View Receipt Dialog */}

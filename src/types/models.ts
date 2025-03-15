@@ -1,46 +1,25 @@
-
 export interface Supplier {
   id: number;
   name: string;
-  address: string;
-  phone: string;
-  email: string;
-  notes: string;
-  initial_debt?: number;
-  current_debt?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface PaymentReceipt {
-  id: number;
-  receipt_id: string;
-  entity: string;
-  entity_id: number;
-  entity_name: string;
-  date: string;
-  amount: number;
-  payment_method: string;
-  notes: string;
-  type?: string;
-  description?: string;
-  created_by?: string;
-  attachment_url?: string;
-  created_at?: string;
-  updated_at?: string;
+  contact_name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  initial_debt: number;
+  total_debt: number;
+  notes?: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
 }
 
 export interface GoodsReceiptItem {
+  id: number;
   product_id: number;
-  variation_id: number;
-  product_name?: string;
-  name?: string;
-  sku: string;
+  product_name: string;
   quantity: number;
   unit_price: number;
-  price: number;
   total_price: number;
-  subtotal: number;
 }
 
 export interface GoodsReceipt {
@@ -51,49 +30,66 @@ export interface GoodsReceipt {
   date: string;
   total_amount: number;
   payment_amount: number;
-  payment_method: string;
-  payment_status: string;
-  status: string;
-  notes: string;
+  payment_status: 'paid' | 'partial' | 'pending';
+  status: 'completed' | 'pending' | 'cancelled';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
   items: GoodsReceiptItem[];
-  affects_stock?: boolean;
-  sync_status?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
 export interface ReturnItem {
+  id?: number;
   product_id: number;
-  variation_id: number;
-  product_name?: string;
+  variation_id?: number;
+  product_name: string;
   name?: string;
-  sku: string;
+  sku?: string;
   quantity: number;
-  unit_price: number;
-  price: number;
+  unit_price?: number;
+  price?: number;
   total_price: number;
   subtotal: number;
-  reason: string;
+  reason?: string;
 }
 
 export interface Return {
   id: number;
   return_id: string;
-  type: string;
+  type: 'customer' | 'supplier';
   entity_id: number;
   entity_name: string;
   date: string;
   reason: string;
   total_amount: number;
   payment_amount: number;
-  payment_status: string;
-  status: string;
-  notes: string;
-  items: ReturnItem[];
-  affects_stock?: boolean;
-  sync_status?: string;
+  payment_status: 'refunded' | 'partial' | 'pending' | 'not_refunded';
+  status: 'completed' | 'pending' | 'cancelled';
+  notes?: string;
   created_at?: string;
   updated_at?: string;
+  items: ReturnItem[];
+}
+
+export interface PaymentReceipt {
+  id: number;
+  receipt_id: string;
+  type: 'payment' | 'receipt';
+  entity_type: 'customer' | 'supplier' | 'other';
+  entity_id: number;
+  entity_name: string;
+  date: string;
+  amount: number;
+  payment_method: 'cash' | 'bank_transfer' | 'card' | 'other';
+  reference?: string;
+  reference_type?: 'order' | 'goods_receipt' | 'return' | 'other';
+  status: 'completed' | 'pending' | 'cancelled';
+  description: string;
+  notes?: string;
+  attachment_url?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DamagedStock {
@@ -102,10 +98,8 @@ export interface DamagedStock {
   product_name: string;
   quantity: number;
   reason: string;
+  notes?: string;
   date: string;
-  notes: string;
-  sync_status?: string;
-  processed?: boolean;
   created_at?: string;
   updated_at?: string;
 }
