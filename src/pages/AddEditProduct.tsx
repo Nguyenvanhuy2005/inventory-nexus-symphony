@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -39,7 +38,6 @@ import { toast } from "sonner";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product, ProductAttribute } from "@/types/models";
 
-// Schema for product form validation
 const productSchema = z.object({
   name: z.string().min(1, "Tên sản phẩm là bắt buộc"),
   sku: z.string().optional(),
@@ -81,7 +79,6 @@ export default function AddEditProduct() {
   const [attributes, setAttributes] = useState<ProductAttribute[]>([]);
   const [activeTab, setActiveTab] = useState("general");
   
-  // Initialize form with default values or existing product data
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -101,7 +98,6 @@ export default function AddEditProduct() {
     }
   });
   
-  // Update form when product data is loaded
   useEffect(() => {
     if (isEditing && product) {
       form.reset({
@@ -134,16 +130,23 @@ export default function AddEditProduct() {
   }, [product, isEditing, form]);
   
   const onSubmit = async (values: ProductFormValues) => {
-    // Prepare product data for API
+    const transformedCategories = values.categories?.map(categoryId => {
+      const categoryName = categories?.find(c => c.id === categoryId)?.name || '';
+      return { 
+        id: categoryId, 
+        name: categoryName 
+      };
+    });
+    
     const productData: Partial<Product> = {
       ...values,
+      categories: transformedCategories,
       images: productImages,
       attributes: attributes.length > 0 ? attributes : undefined,
     };
     
     try {
       if (isEditing && productId) {
-        // Update existing product
         await updateProductMutation.mutateAsync({
           id: productId,
           ...productData
@@ -151,7 +154,6 @@ export default function AddEditProduct() {
         toast.success("Sản phẩm đã được cập nhật thành công");
         navigate(`/inventory/product/${productId}`);
       } else {
-        // Create new product
         const newProduct = await createProductMutation.mutateAsync(productData);
         toast.success("Sản phẩm đã được tạo thành công");
         navigate(`/inventory/product/${newProduct.id}`);
@@ -163,7 +165,6 @@ export default function AddEditProduct() {
   };
   
   const handleAddImage = () => {
-    // In a real app, this would open a file picker and upload the image
     const newImage = {
       src: "https://via.placeholder.com/300"
     };
