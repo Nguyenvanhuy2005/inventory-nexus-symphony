@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, ArrowUpDown, RefreshCw, Info } from "lucide-react";
+import { Search, Filter, ArrowUpDown, RefreshCw, Info, Edit, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product } from "@/types/models";
 import { toast } from "sonner";
@@ -24,6 +25,8 @@ const formatCurrency = (value: string | undefined) => {
 };
 
 export default function Inventory() {
+  const navigate = useNavigate();
+  
   // Use useQuery to fetch products from WooCommerce
   const { data: products, isLoading: isLoadingProducts, refetch: refetchProducts, error: productsError } = useQuery({
     queryKey: ['woocommerce-products'],
@@ -117,6 +120,21 @@ export default function Inventory() {
     );
   };
   
+  // Navigate to stock adjustment page
+  const handleCreateStockAdjustment = () => {
+    navigate('/stock-adjustments/new');
+  };
+  
+  // Navigate to edit product page
+  const handleEditProduct = (productId: number) => {
+    navigate(`/inventory/product/edit/${productId}`);
+  };
+
+  // Navigate to add product page
+  const handleAddProduct = () => {
+    navigate('/inventory/product/add');
+  };
+
   // Generate stock status badge
   const getStockStatusBadge = (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => {
     if (product.stock_status === "outofstock") {
@@ -138,7 +156,7 @@ export default function Inventory() {
       <Card>
         <div className="p-4">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -160,6 +178,17 @@ export default function Inventory() {
                 Thông tin dữ liệu
               </Button>
             </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleCreateStockAdjustment}>
+                <Plus className="mr-2 h-4 w-4" />
+                Điều chỉnh tồn kho
+              </Button>
+              <Button variant="secondary" onClick={handleAddProduct}>
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm sản phẩm
+              </Button>
+            </div>
           </div>
           
           <Tabs defaultValue="all" className="mt-4" value={tab} onValueChange={setTab}>
@@ -175,6 +204,7 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
+                onEditProduct={handleEditProduct}
               />
             </TabsContent>
             <TabsContent value="instock" className="mt-4">
@@ -183,6 +213,7 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
+                onEditProduct={handleEditProduct}
               />
             </TabsContent>
             <TabsContent value="lowstock" className="mt-4">
@@ -191,6 +222,7 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
+                onEditProduct={handleEditProduct}
               />
             </TabsContent>
             <TabsContent value="outofstock" className="mt-4">
@@ -199,6 +231,7 @@ export default function Inventory() {
                 isLoading={isLoading}
                 hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
+                onEditProduct={handleEditProduct}
               />
             </TabsContent>
           </Tabs>
@@ -213,9 +246,10 @@ interface ProductsTableProps {
   isLoading: boolean;
   hasError: boolean;
   getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => JSX.Element;
+  onEditProduct: (productId: number) => void;
 }
 
-function ProductsTable({ products, isLoading, hasError, getStockStatusBadge }: ProductsTableProps) {
+function ProductsTable({ products, isLoading, hasError, getStockStatusBadge, onEditProduct }: ProductsTableProps) {
   if (hasError) {
     return (
       <div className="py-12 text-center">
@@ -252,12 +286,13 @@ function ProductsTable({ products, isLoading, hasError, getStockStatusBadge }: P
           </TableHead>
           <TableHead>Giá</TableHead>
           <TableHead>Trạng thái</TableHead>
+          <TableHead>Thao tác</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {isLoading ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center">
+            <TableCell colSpan={8} className="text-center">
               <div className="flex items-center justify-center py-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
               </div>
@@ -265,7 +300,7 @@ function ProductsTable({ products, isLoading, hasError, getStockStatusBadge }: P
           </TableRow>
         ) : products?.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center">
+            <TableCell colSpan={8} className="text-center">
               Không tìm thấy sản phẩm nào
             </TableCell>
           </TableRow>
@@ -290,6 +325,15 @@ function ProductsTable({ products, isLoading, hasError, getStockStatusBadge }: P
               <TableCell>{product.available_to_sell !== undefined ? product.available_to_sell : product.stock_quantity || 0}</TableCell>
               <TableCell>{formatCurrency(product.price)}</TableCell>
               <TableCell>{getStockStatusBadge(product)}</TableCell>
+              <TableCell>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => onEditProduct(product.id)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))
         )}
