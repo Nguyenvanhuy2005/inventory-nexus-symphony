@@ -36,7 +36,7 @@ const queryClient = new QueryClient({
 const App = () => {
   // Initialize default credentials and check authentication status on app start
   useEffect(() => {
-    // Initialize default credentials
+    // Initialize default credentials immediately
     initializeDefaultCredentials();
     
     const checkAuth = async () => {

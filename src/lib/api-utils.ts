@@ -1,13 +1,22 @@
 
 import { toast } from "sonner";
+import { initializeDefaultCredentials } from "./auth-utils";
+
+// Initialize credentials on module load
+initializeDefaultCredentials();
 
 // API base URLs with fallbacks that will work in browser environment
 const API_BASE_URL = import.meta.env.VITE_API_URL || localStorage.getItem('api_url') || 'https://hmm.vn/wp-json';
 const WOOCOMMERCE_API_URL = import.meta.env.VITE_WOOCOMMERCE_API_URL || localStorage.getItem('woocommerce_api_url') || 'https://hmm.vn/wp-json/wc/v3';
 
 // WooCommerce authentication keys from environment or localStorage
-const CONSUMER_KEY = import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY || localStorage.getItem('woocommerce_consumer_key') || '';
-const CONSUMER_SECRET = import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET || localStorage.getItem('woocommerce_consumer_secret') || '';
+function getConsumerKey() {
+  return import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY || localStorage.getItem('woocommerce_consumer_key') || '';
+}
+
+function getConsumerSecret() {
+  return import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET || localStorage.getItem('woocommerce_consumer_secret') || '';
+}
 
 // Mock data for WooCommerce API fallback - only used for development and debugging
 export const mockWooCommerceData = {
@@ -146,6 +155,10 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
+    // Get the latest credentials from localStorage
+    const CONSUMER_KEY = getConsumerKey();
+    const CONSUMER_SECRET = getConsumerSecret();
+
     // Build URL with authentication parameters
     let url = `${WOOCOMMERCE_API_URL}${endpoint}`;
     const searchParams = new URLSearchParams();
@@ -154,6 +167,8 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
     if (CONSUMER_KEY && CONSUMER_SECRET) {
       searchParams.append('consumer_key', CONSUMER_KEY);
       searchParams.append('consumer_secret', CONSUMER_SECRET);
+    } else {
+      console.warn('WooCommerce API credentials not found');
     }
     
     // Add any other parameters from options
@@ -166,7 +181,10 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
     // Append all parameters to the URL
     url += `?${searchParams.toString()}`;
     
-    console.info(`Fetching WooCommerce API: ${url}`);
+    console.info(`Fetching WooCommerce API: ${endpoint}`, {
+      url: url.replace(/consumer_secret=([^&]+)/, 'consumer_secret=****'),
+      hasCredentials: !!CONSUMER_KEY && !!CONSUMER_SECRET
+    });
     
     const response = await fetch(url, fetchOptions);
     

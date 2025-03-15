@@ -22,6 +22,9 @@ export const DEFAULT_WORDPRESS_CREDENTIALS = {
  */
 export async function checkWooCommerceAuth(): Promise<boolean> {
   try {
+    // Ensure credentials are initialized
+    initializeDefaultCredentials();
+    
     // Try to fetch a simple endpoint that requires authentication
     const result = await fetchWooCommerce('/system_status', {
       suppressToast: true
@@ -38,13 +41,7 @@ export async function checkWooCommerceAuth(): Promise<boolean> {
  */
 export async function getAuthStatus() {
   // Set default credentials in localStorage if they don't exist
-  if (!localStorage.getItem('woocommerce_consumer_key')) {
-    localStorage.setItem('woocommerce_consumer_key', DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_key);
-  }
-  
-  if (!localStorage.getItem('woocommerce_consumer_secret')) {
-    localStorage.setItem('woocommerce_consumer_secret', DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_secret);
-  }
+  initializeDefaultCredentials();
   
   // Check authentication with the credentials
   const wooCommerceAuth = await checkWooCommerceAuth();
@@ -67,14 +64,25 @@ export async function getAuthStatus() {
  */
 export function initializeDefaultCredentials() {
   // Initialize WooCommerce credentials
-  if (!localStorage.getItem('woocommerce_consumer_key')) {
+  if (!localStorage.getItem('woocommerce_consumer_key') || localStorage.getItem('woocommerce_consumer_key') === '') {
     localStorage.setItem('woocommerce_consumer_key', DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_key);
   }
   
-  if (!localStorage.getItem('woocommerce_consumer_secret')) {
+  if (!localStorage.getItem('woocommerce_consumer_secret') || localStorage.getItem('woocommerce_consumer_secret') === '') {
     localStorage.setItem('woocommerce_consumer_secret', DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_secret);
   }
   
-  // You can also initialize WordPress credentials here if needed
-  console.log('Default API credentials initialized');
+  // Also initialize WordPress credentials if needed
+  if (!localStorage.getItem('wordpress_username') || localStorage.getItem('wordpress_username') === '') {
+    localStorage.setItem('wordpress_username', DEFAULT_WORDPRESS_CREDENTIALS.username);
+  }
+  
+  if (!localStorage.getItem('wordpress_application_password') || localStorage.getItem('wordpress_application_password') === '') {
+    localStorage.setItem('wordpress_application_password', DEFAULT_WORDPRESS_CREDENTIALS.application_password);
+  }
+  
+  console.log('API credentials initialized:',  {
+    woo_key: localStorage.getItem('woocommerce_consumer_key'),
+    woo_secret: localStorage.getItem('woocommerce_consumer_secret')?.substring(0, 5) + '...'
+  });
 }
