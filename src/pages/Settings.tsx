@@ -81,9 +81,9 @@ export default function Settings() {
         ...(window as any).process,
         env: {
           ...(window as any).process?.env,
-          NEXT_PUBLIC_WOOCOMMERCE_CONSUMER_KEY: apiKeys.woocommerce_consumer_key,
-          NEXT_PUBLIC_WOOCOMMERCE_CONSUMER_SECRET: apiKeys.woocommerce_consumer_secret,
-          NEXT_PUBLIC_CUSTOM_API_KEY: apiKeys.custom_api_key,
+          VITE_WOOCOMMERCE_CONSUMER_KEY: apiKeys.woocommerce_consumer_key,
+          VITE_WOOCOMMERCE_CONSUMER_SECRET: apiKeys.woocommerce_consumer_secret,
+          VITE_CUSTOM_API_KEY: apiKeys.custom_api_key,
         }
       };
     }
@@ -103,8 +103,8 @@ export default function Settings() {
         ...(window as any).process,
         env: {
           ...(window as any).process?.env,
-          NEXT_PUBLIC_API_URL: apiUrls.api_url,
-          NEXT_PUBLIC_WOOCOMMERCE_API_URL: apiUrls.woocommerce_api_url,
+          VITE_API_URL: apiUrls.api_url,
+          VITE_WOOCOMMERCE_API_URL: apiUrls.woocommerce_api_url,
         }
       };
     }

@@ -1,18 +1,39 @@
 
 import { useState } from "react";
-import { useGetCustomers } from "@/hooks/use-mock-data";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Plus, Edit, Eye, Mail, Phone } from "lucide-react";
+import { Search, Plus, Edit, Eye, Mail, Phone, RefreshCw } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { formatDate } from "@/lib/utils";
+import { toast } from "sonner";
+import { fetchWooCommerce } from "@/lib/api-utils";
+import { mockCustomers } from "@/lib/mock-data";
 
 export default function Customers() {
-  const { data: customers, isLoading } = useGetCustomers();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Use direct API fetching with fallback to mock data
+  const { data: customers, isLoading, refetch, error } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      try {
+        const response = await fetchWooCommerce('/customers', { 
+          params: { per_page: '100' } 
+        });
+        console.log("Customers fetched:", response);
+        return response;
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        toast.error("Lỗi kết nối API. Hiển thị dữ liệu mẫu.");
+        return mockCustomers;
+      }
+    },
+    retry: 1
+  });
   
   // Filter customers based on search term
   const filteredCustomers = customers?.filter(customer => {
@@ -31,6 +52,17 @@ export default function Customers() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
+  // Function to refresh data
+  const refreshData = async () => {
+    toast.info("Đang tải lại dữ liệu khách hàng...");
+    try {
+      await refetch();
+      toast.success("Dữ liệu khách hàng đã được tải lại thành công");
+    } catch (error) {
+      toast.error("Không thể tải lại dữ liệu khách hàng");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <DashboardHeader 
@@ -41,15 +73,20 @@ export default function Customers() {
       <Card>
         <div className="p-4">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Tìm khách hàng..."
-                className="pl-8 w-full md:w-[300px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Tìm khách hàng..."
+                  className="pl-8 w-full md:w-[300px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" size="icon" onClick={refreshData}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
             <Button className="shrink-0">
               <Plus className="mr-2 h-4 w-4" />
@@ -76,6 +113,12 @@ export default function Customers() {
                     <div className="flex items-center justify-center py-4">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                     </div>
+                  </TableCell>
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center">
+                    <div className="text-red-500">Lỗi WooCommerce API: Không thể kết nối tới máy chủ. Hiển thị dữ liệu mẫu.</div>
                   </TableCell>
                 </TableRow>
               ) : filteredCustomers?.length === 0 ? (

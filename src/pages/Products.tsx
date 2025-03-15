@@ -13,9 +13,10 @@ import { Product } from "@/types/models";
 import { fetchWooCommerce } from "@/lib/api-utils";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { mockProducts } from "@/lib/mock-data";
 
 export default function Products() {
-  // Use useQuery to fetch products directly from WooCommerce
+  // Use useQuery to fetch products directly from WooCommerce with fallback to mock data
   const { data: products, isLoading, refetch, error } = useQuery({
     queryKey: ['wc-products'],
     queryFn: async () => {
@@ -30,8 +31,8 @@ export default function Products() {
         return response as Product[];
       } catch (error) {
         console.error("Error fetching products:", error);
-        toast.error("Không thể lấy dữ liệu sản phẩm");
-        throw error;
+        toast.error("Lỗi kết nối API. Hiển thị dữ liệu mẫu.");
+        return mockProducts;
       }
     },
     retry: 1
@@ -118,7 +119,7 @@ export default function Products() {
               ) : error ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center">
-                    <div className="text-red-500">Có lỗi khi tải dữ liệu sản phẩm. Vui lòng thử lại sau.</div>
+                    <div className="text-red-500">Lỗi WooCommerce API: Không thể kết nối tới máy chủ. Hiển thị dữ liệu mẫu.</div>
                   </TableCell>
                 </TableRow>
               ) : filteredProducts?.length === 0 ? (

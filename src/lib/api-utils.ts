@@ -2,8 +2,12 @@
 import { toast } from "sonner";
 
 // API base URLs with fallbacks that will work in browser environment
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://hmm.vn/wp-json';
-const WOOCOMMERCE_API_URL = import.meta.env.VITE_WOOCOMMERCE_API_URL || 'https://hmm.vn/wp-json/wc/v3';
+const API_BASE_URL = import.meta.env.VITE_API_URL || localStorage.getItem('api_url') || 'https://hmm.vn/wp-json';
+const WOOCOMMERCE_API_URL = import.meta.env.VITE_WOOCOMMERCE_API_URL || localStorage.getItem('woocommerce_api_url') || 'https://hmm.vn/wp-json/wc/v3';
+
+// WooCommerce authentication keys from environment or localStorage
+const CONSUMER_KEY = import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY || localStorage.getItem('woocommerce_consumer_key') || '';
+const CONSUMER_SECRET = import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET || localStorage.getItem('woocommerce_consumer_secret') || '';
 
 // Mock data for WooCommerce API fallback - only used for development and debugging
 export const mockWooCommerceData = {
@@ -142,15 +146,25 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    // Build URL with params if they exist
+    // Build URL with authentication parameters
     let url = `${WOOCOMMERCE_API_URL}${endpoint}`;
+    const searchParams = new URLSearchParams();
+    
+    // Add authentication parameters
+    if (CONSUMER_KEY && CONSUMER_SECRET) {
+      searchParams.append('consumer_key', CONSUMER_KEY);
+      searchParams.append('consumer_secret', CONSUMER_SECRET);
+    }
+    
+    // Add any other parameters from options
     if (options.params) {
-      const searchParams = new URLSearchParams();
       Object.entries(options.params).forEach(([key, value]) => {
         searchParams.append(key, value as string);
       });
-      url += `?${searchParams.toString()}`;
     }
+    
+    // Append all parameters to the URL
+    url += `?${searchParams.toString()}`;
     
     console.info(`Fetching WooCommerce API: ${url}`);
     
