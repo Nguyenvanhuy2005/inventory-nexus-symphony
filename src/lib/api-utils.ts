@@ -235,6 +235,13 @@ export async function fetchWordPress(endpoint: string, options: any = {}) {
       ...options
     };
 
+    // Lấy thông tin xác thực từ localStorage hoặc mặc định
+    const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
+    const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
+
+    // Thêm header Basic Authentication
+    fetchOptions.headers['Authorization'] = 'Basic ' + btoa(`${username}:${password}`);
+
     // If there's a body, stringify it
     if (options.body && typeof options.body === 'object') {
       fetchOptions.body = JSON.stringify(options.body);
@@ -242,23 +249,23 @@ export async function fetchWordPress(endpoint: string, options: any = {}) {
 
     const url = `${API_BASE_URL}/wp/v2${endpoint}`;
     console.info(`Fetching WordPress API: ${endpoint}`);
-    
+
     const response = await fetch(url, fetchOptions);
-    
+
     if (!response.ok) {
       throw new Error(`WordPress API request failed: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
     console.error(`Error fetching from WordPress API (${endpoint}):`, error);
-    
+
     // Fallback for users endpoint
     if (endpoint.includes('/users')) {
       return mockWooCommerceData.users;
     }
-    
+
     // Don't show toast for GET requests to avoid flooding the UI
     if (!options.suppressToast && options.method && options.method !== 'GET') {
       toast.error(`Lỗi WordPress API: ${error instanceof Error ? error.message : 'Không thể kết nối tới máy chủ'}`);
