@@ -1,3 +1,4 @@
+
 <?php
 /**
  * Plugin Name: HMM Custom API
@@ -132,7 +133,7 @@ function hmm_register_custom_api_endpoints() {
         'permission_callback' => '__return_true',
     ));
     
-    // Register stock levels endpoints - moved inside the rest_api_init hook
+    // Register stock levels endpoints
     register_rest_route('custom/v1', '/stock-levels', array(
         'methods' => 'GET',
         'callback' => 'hmm_get_stock_levels',
@@ -151,7 +152,7 @@ function hmm_register_custom_api_endpoints() {
         'permission_callback' => 'hmm_api_permissions_check',
     ));
 
-    // Register status endpoint - now properly inside rest_api_init
+    // Register status endpoint
     register_rest_route('custom/v1', '/status', array(
         'methods' => 'GET',
         'callback' => 'hmm_api_status',
@@ -166,6 +167,16 @@ add_action('rest_api_init', 'hmm_register_custom_api_endpoints');
 function hmm_api_permissions_check($request) {
     // Cho phép truy cập nếu người dùng có quyền edit_posts
     return current_user_can('edit_posts');
+}
+
+// API status check function
+function hmm_api_status() {
+    return array(
+        'status' => 'ok',
+        'message' => 'HMM Custom API is running',
+        'version' => '1.0.1',
+        'timestamp' => current_time('mysql')
+    );
 }
 
 // --- Damaged Stock Functions ---
@@ -779,3 +790,396 @@ function hmm_get_payment_receipts() {
 function hmm_get_payment_receipt($request) {
     global $wpdb;
     $receipt_id = $request['id'];
+    $table_name = $wpdb->prefix . 'hmm_payment_receipts';
+    
+    $receipt = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $receipt_id),
+        ARRAY_A
+    );
+    
+    if (!$receipt) {
+        return new WP_Error('not_found', 'Không tìm thấy phiếu thu chi', array('status' => 404));
+    }
+    
+    return $receipt;
+}
+
+function hmm_create_payment_receipt($request) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_payment_receipts';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_payment_receipts_table();
+    }
+    
+    $params = $request->get_params();
+    
+    // Validate required fields
+    if (empty($params['entity']) || empty($params['entity_id']) || 
+        empty($params['type']) || empty($params['amount'])) {
+        return new WP_Error('missing_fields', 'Thiếu thông tin bắt buộc', array('status' => 400));
+    }
+    
+    $wpdb->insert(
+        $table_name,
+        array(
+            'receipt_id' => $params['receipt_id'] ?? 'PR-' . time(),
+            'entity' => $params['entity'],
+            'entity_id' => $params['entity_id'],
+            'entity_name' => $params['entity_name'],
+            'type' => $params['type'],
+            'amount' => $params['amount'],
+            'payment_method' => $params['payment_method'] ?? 'cash',
+            'reference' => $params['reference'] ?? '',
+            'date' => $params['date'] ?? current_time('mysql'),
+            'notes' => $params['notes'] ?? '',
+            'created_at' => current_time('mysql')
+        )
+    );
+    
+    if ($wpdb->last_error) {
+        return new WP_Error('db_error', $wpdb->last_error, array('status' => 500));
+    }
+    
+    $new_id = $wpdb->insert_id;
+    $receipt = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $new_id), ARRAY_A);
+    
+    // Cập nhật nợ hiện tại của nhà cung cấp hoặc khách hàng
+    if ($params['entity'] === 'supplier') {
+        $supplier_table = $wpdb->prefix . 'hmm_suppliers';
+        $supplier = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM $supplier_table WHERE id = %d", $params['entity_id']),
+            ARRAY_A
+        );
+        
+        if ($supplier) {
+            $debt_change = $params['type'] === 'payment' ? -$params['amount'] : $params['amount'];
+            $new_debt = $supplier['current_debt'] + $debt_change;
+            
+            $wpdb->update(
+                $supplier_table,
+                array('current_debt' => $new_debt),
+                array('id' => $params['entity_id'])
+            );
+        }
+    }
+    
+    return $receipt;
+}
+
+function hmm_create_payment_receipts_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_payment_receipts';
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE $table_name (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        receipt_id varchar(50) NOT NULL,
+        entity varchar(20) NOT NULL,
+        entity_id bigint(20) NOT NULL,
+        entity_name varchar(255) NOT NULL,
+        type varchar(20) NOT NULL,
+        amount decimal(15,2) NOT NULL,
+        payment_method varchar(20) NOT NULL DEFAULT 'cash',
+        reference varchar(100),
+        date datetime DEFAULT CURRENT_TIMESTAMP,
+        notes text,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+// --- Stock Levels Functions ---
+function hmm_get_stock_levels() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_stock_levels_table();
+    }
+    
+    $stock_levels = $wpdb->get_results("SELECT * FROM $table_name", ARRAY_A);
+    
+    return $stock_levels;
+}
+
+function hmm_get_stock_level($request) {
+    global $wpdb;
+    $product_id = $request['product_id'];
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_stock_levels_table();
+    }
+    
+    $stock_level = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM $table_name WHERE product_id = %d", $product_id),
+        ARRAY_A
+    );
+    
+    if (!$stock_level) {
+        // Nếu không có dữ liệu trong bảng tồn kho, tạo mới với giá trị mặc định
+        $stock_level = array(
+            'product_id' => $product_id,
+            'ton_thuc_te' => 0,
+            'co_the_ban' => 0,
+            'last_updated' => current_time('mysql')
+        );
+    }
+    
+    return $stock_level;
+}
+
+function hmm_update_stock_level($request) {
+    global $wpdb;
+    $product_id = $request['product_id'];
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_stock_levels_table();
+    }
+    
+    $params = $request->get_params();
+    
+    // Validate required fields
+    if (!isset($params['ton_thuc_te']) && !isset($params['co_the_ban'])) {
+        return new WP_Error('missing_fields', 'Thiếu thông tin tồn kho', array('status' => 400));
+    }
+    
+    // Kiểm tra xem sản phẩm đã có trong bảng tồn kho chưa
+    $exists = $wpdb->get_var(
+        $wpdb->prepare("SELECT COUNT(*) FROM $table_name WHERE product_id = %d", $product_id)
+    );
+    
+    $update_data = array(
+        'last_updated' => current_time('mysql')
+    );
+    
+    if (isset($params['ton_thuc_te'])) {
+        $update_data['ton_thuc_te'] = $params['ton_thuc_te'];
+    }
+    
+    if (isset($params['co_the_ban'])) {
+        $update_data['co_the_ban'] = $params['co_the_ban'];
+    }
+    
+    if ($exists) {
+        // Cập nhật thông tin tồn kho
+        $wpdb->update(
+            $table_name,
+            $update_data,
+            array('product_id' => $product_id)
+        );
+    } else {
+        // Thêm thông tin tồn kho mới
+        $update_data['product_id'] = $product_id;
+        $wpdb->insert($table_name, $update_data);
+    }
+    
+    if ($wpdb->last_error) {
+        return new WP_Error('db_error', $wpdb->last_error, array('status' => 500));
+    }
+    
+    // Lấy thông tin tồn kho đã cập nhật
+    $stock_level = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM $table_name WHERE product_id = %d", $product_id),
+        ARRAY_A
+    );
+    
+    return $stock_level;
+}
+
+function hmm_create_stock_levels_table() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    // Bảng tồn kho
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    $sql = "CREATE TABLE $table_name (
+        product_id bigint(20) NOT NULL,
+        ton_thuc_te int(11) NOT NULL DEFAULT 0,
+        co_the_ban int(11) NOT NULL DEFAULT 0,
+        last_updated datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (product_id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+// --- Attachment Functions ---
+function hmm_upload_attachment($request) {
+    $files = $request->get_file_params();
+    
+    if (empty($files['file'])) {
+        return new WP_Error('no_file', 'Không có file được tải lên', array('status' => 400));
+    }
+    
+    // Thêm tệp vào thư viện media
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+    
+    $attachment_id = media_handle_upload('file', 0);
+    
+    if (is_wp_error($attachment_id)) {
+        return $attachment_id;
+    }
+    
+    // Lấy thông tin đính kèm
+    $attachment = get_post($attachment_id);
+    
+    // Lưu thông tin vào bảng đính kèm nếu có entity_type và entity_id
+    $params = $request->get_params();
+    if (!empty($params['entity_type']) && !empty($params['entity_id'])) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'hmm_attachments';
+        
+        // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+        if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            hmm_create_attachments_table();
+        }
+        
+        $wpdb->insert(
+            $table_name,
+            array(
+                'attachment_id' => $attachment_id,
+                'entity_type' => $params['entity_type'],
+                'entity_id' => $params['entity_id'],
+                'file_name' => basename(get_attached_file($attachment_id)),
+                'file_url' => wp_get_attachment_url($attachment_id),
+                'file_type' => get_post_mime_type($attachment_id),
+                'created_at' => current_time('mysql')
+            )
+        );
+    }
+    
+    return array(
+        'id' => $attachment_id,
+        'title' => $attachment->post_title,
+        'url' => wp_get_attachment_url($attachment_id),
+        'type' => get_post_mime_type($attachment_id),
+        'alt' => get_post_meta($attachment_id, '_wp_attachment_image_alt', true)
+    );
+}
+
+function hmm_get_attachments($request) {
+    $entity_type = $request['entity_type'];
+    $entity_id = $request['entity_id'];
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_attachments';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_attachments_table();
+        return array();
+    }
+    
+    $attachments = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT * FROM $table_name WHERE entity_type = %s AND entity_id = %d",
+            $entity_type,
+            $entity_id
+        ),
+        ARRAY_A
+    );
+    
+    return $attachments;
+}
+
+function hmm_create_attachments_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_attachments';
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE $table_name (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        attachment_id bigint(20) NOT NULL,
+        entity_type varchar(50) NOT NULL,
+        entity_id bigint(20) NOT NULL,
+        file_name varchar(255) NOT NULL,
+        file_url text NOT NULL,
+        file_type varchar(100) NOT NULL,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        KEY entity (entity_type, entity_id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+// --- Table Creation Helper Functions ---
+function hmm_create_stock_entries_table() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    // Bảng sản phẩm nhập kho
+    $table_entries = $wpdb->prefix . 'hmm_stock_entries';
+    $table_orders = $wpdb->prefix . 'hmm_purchase_orders';
+    
+    $sql_entries = "CREATE TABLE $table_entries (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        purchase_order_id bigint(20) NOT NULL,
+        product_id bigint(20) NOT NULL,
+        quantity int(11) NOT NULL,
+        cost_price decimal(15,2) NOT NULL,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        KEY purchase_order_id (purchase_order_id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql_entries);
+}
+
+function hmm_create_purchase_orders_table() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    // Bảng quản lý phiếu nhập
+    $table_orders = $wpdb->prefix . 'hmm_purchase_orders';
+    
+    $sql_orders = "CREATE TABLE $table_orders (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        supplier_id bigint(20) NOT NULL,
+        order_date datetime DEFAULT CURRENT_TIMESTAMP,
+        status varchar(50) NOT NULL,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql_orders);
+}
+
+// Activation hook để tạo các bảng cần thiết
+register_activation_hook(__FILE__, 'hmm_activate_plugin');
+
+function hmm_activate_plugin() {
+    hmm_create_damaged_stock_table();
+    hmm_create_goods_receipts_table();
+    hmm_create_returns_table();
+    hmm_create_suppliers_table();
+    hmm_create_payment_receipts_table();
+    hmm_create_stock_levels_table();
+    hmm_create_purchase_orders_table();
+    hmm_create_stock_entries_table();
+    hmm_create_attachments_table();
+}
+
+// Deactivation hook
+register_deactivation_hook(__FILE__, 'hmm_deactivate_plugin');
+
+function hmm_deactivate_plugin() {
+    // Thực hiện các thao tác khi plugin bị tắt
+}
+
