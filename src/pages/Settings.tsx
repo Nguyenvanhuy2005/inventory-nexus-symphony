@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, AlertTriangle, Key, Server, Database, User, Globe, Cog, RefreshCw } from "lucide-react";
+import { CheckCircle, AlertTriangle, Key, Server, Database, User, Globe, Cog, RefreshCw, BarChart } from "lucide-react";
 import { useCheckAPIStatus } from "@/hooks/api-hooks";
 import { fetchWordPress, getWordPressUsers } from "@/lib/api-utils";
 import { toast } from "sonner";
@@ -39,6 +39,9 @@ export default function Settings() {
     enable_auto_order: localStorage.getItem('enable_auto_order') === 'true',
     enable_stock_notifications: localStorage.getItem('enable_stock_notifications') === 'true',
     default_supplier: localStorage.getItem('default_supplier') || '',
+    sync_on_receipt: localStorage.getItem('sync_on_receipt') === 'true',
+    sync_on_return: localStorage.getItem('sync_on_return') === 'true',
+    sync_on_adjustment: localStorage.getItem('sync_on_adjustment') === 'true',
   });
   
   const [selectedUser, setSelectedUser] = useState(localStorage.getItem('selected_user') || '');
@@ -127,6 +130,9 @@ export default function Settings() {
     localStorage.setItem('enable_auto_order', inventorySettings.enable_auto_order.toString());
     localStorage.setItem('enable_stock_notifications', inventorySettings.enable_stock_notifications.toString());
     localStorage.setItem('default_supplier', inventorySettings.default_supplier);
+    localStorage.setItem('sync_on_receipt', inventorySettings.sync_on_receipt.toString());
+    localStorage.setItem('sync_on_return', inventorySettings.sync_on_return.toString());
+    localStorage.setItem('sync_on_adjustment', inventorySettings.sync_on_adjustment.toString());
     
     toast.success('Đã lưu cài đặt tồn kho');
   };
@@ -450,6 +456,48 @@ export default function Settings() {
                     checked={inventorySettings.enable_stock_notifications}
                     onCheckedChange={(checked) => setInventorySettings({...inventorySettings, enable_stock_notifications: checked})}
                   />
+                </div>
+              </div>
+              
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-lg font-semibold mb-2">Cài đặt đồng bộ tồn kho</h3>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="sync_on_receipt">Đồng bộ khi nhập hàng</Label>
+                      <p className="text-sm text-muted-foreground">Tự động đồng bộ tồn kho với WooCommerce khi nhập hàng</p>
+                    </div>
+                    <Switch
+                      id="sync_on_receipt"
+                      checked={inventorySettings.sync_on_receipt}
+                      onCheckedChange={(checked) => setInventorySettings({...inventorySettings, sync_on_receipt: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="sync_on_return">Đồng bộ khi trả hàng</Label>
+                      <p className="text-sm text-muted-foreground">Tự động đồng bộ tồn kho với WooCommerce khi trả hàng</p>
+                    </div>
+                    <Switch
+                      id="sync_on_return"
+                      checked={inventorySettings.sync_on_return}
+                      onCheckedChange={(checked) => setInventorySettings({...inventorySettings, sync_on_return: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="sync_on_adjustment">Đồng bộ khi điều chỉnh</Label>
+                      <p className="text-sm text-muted-foreground">Tự động đồng bộ tồn kho với WooCommerce khi điều chỉnh tồn kho</p>
+                    </div>
+                    <Switch
+                      id="sync_on_adjustment"
+                      checked={inventorySettings.sync_on_adjustment}
+                      onCheckedChange={(checked) => setInventorySettings({...inventorySettings, sync_on_adjustment: checked})}
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>

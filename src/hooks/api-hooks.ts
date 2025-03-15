@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchCustomAPI, checkAPIStatus, fetchWooCommerce } from "@/lib/api-utils";
@@ -390,11 +389,21 @@ export function useCreateStockLevel() {
 }
 
 // --- Stock Transactions ---
-export function useGetStockTransactions() {
+export function useGetStockTransactions(params?: { page?: number, per_page?: number, product_id?: number }) {
   return useQuery({
-    queryKey: ['stockTransactions'],
+    queryKey: ['stockTransactions', params],
     queryFn: async () => {
-      return await fetchCustomAPI('/stock-transactions') as {
+      let endpoint = '/stock-transactions';
+      if (params) {
+        const searchParams = new URLSearchParams();
+        if (params.page) searchParams.append('page', params.page.toString());
+        if (params.per_page) searchParams.append('per_page', params.per_page.toString());
+        if (params.product_id) searchParams.append('product_id', params.product_id.toString());
+        if (searchParams.toString()) {
+          endpoint += `?${searchParams.toString()}`;
+        }
+      }
+      return await fetchCustomAPI(endpoint) as {
         transactions: StockTransaction[],
         total: number,
         page: number,
@@ -407,12 +416,14 @@ export function useGetStockTransactions() {
 
 export function useGetProductStockTransactions(productId: number) {
   return useQuery({
-    queryKey: ['stockTransactions', productId.toString()],
+    queryKey: ['stockTransactions', 'product', productId.toString()],
     queryFn: async () => {
-      return await fetchCustomAPI(`/stock-transactions/${productId}`) as {
-        product_id: number,
-        product_name: string,
-        transactions: StockTransaction[]
+      return await fetchCustomAPI(`/stock-transactions?product_id=${productId}`) as {
+        transactions: StockTransaction[],
+        total: number,
+        page: number,
+        per_page: number,
+        total_pages: number
       };
     },
     enabled: !!productId

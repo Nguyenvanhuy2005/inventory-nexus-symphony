@@ -394,3 +394,36 @@ export function getTransactionTypeDisplay(type: string): string {
   
   return types[type] || type;
 }
+
+/**
+ * Get reference type display name for UI
+ * @param type Reference type from database
+ * @returns Human-readable reference type in Vietnamese
+ */
+export function getReferenceTypeDisplay(type: string): string {
+  const types = {
+    'goods_receipt': 'Phiếu nhập hàng',
+    'return': 'Phiếu trả hàng',
+    'damaged': 'Báo cáo hàng hỏng',
+    'adjustment': 'Điều chỉnh tồn kho',
+    'order': 'Đơn hàng',
+    'sync': 'Đồng bộ tồn kho'
+  };
+  
+  return types[type] || type;
+}
+
+/**
+ * Format transaction for display
+ * @param transaction Stock transaction data
+ * @returns Formatted transaction data with display fields
+ */
+export function formatTransactionForDisplay(transaction: any) {
+  return {
+    ...transaction,
+    transaction_type_display: getTransactionTypeDisplay(transaction.transaction_type),
+    reference_type_display: transaction.reference_type ? getReferenceTypeDisplay(transaction.reference_type) : '',
+    quantity_formatted: transaction.quantity > 0 ? `+${transaction.quantity}` : transaction.quantity,
+    created_at_formatted: new Date(transaction.created_at).toLocaleString('vi-VN')
+  };
+}
