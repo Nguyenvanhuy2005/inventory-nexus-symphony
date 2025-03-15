@@ -16,11 +16,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
-import { CalendarIcon, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import ProductSelectAutoComplete from "./ProductSelectAutoComplete";
 
@@ -136,28 +134,10 @@ export default function StockAdjustmentForm({ onSuccess }: StockAdjustmentFormPr
               <FormItem>
                 <FormLabel>Ngày điều chỉnh</FormLabel>
                 <FormControl>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(field.value, "dd/MM/yyyy") : "Chọn ngày"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker 
+                    date={field.value} 
+                    setDate={field.onChange}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { 
-  CheckCircledIcon, 
+  CheckCircleIcon, 
   CircleSlash, 
   Copy, 
   Loader2, 
@@ -21,7 +22,7 @@ import {
   DEFAULT_WOOCOMMERCE_CREDENTIALS, 
   DEFAULT_WORDPRESS_CREDENTIALS 
 } from "@/lib/auth-utils";
-import { useGetApiStatus } from "@/hooks/api-hooks";
+import { useCheckAPIStatus } from "@/hooks/api-hooks";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function Settings() {
   const [wpUsername, setWpUsername] = useState(localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username);
   const [wpPassword, setWpPassword] = useState(localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password);
   const [isSaving, setIsSaving] = useState(false);
-  const apiStatus = useGetApiStatus();
+  const apiStatus = useCheckAPIStatus();
   
   useEffect(() => {
     if (apiStatus.isSuccess) {
@@ -104,8 +105,8 @@ export default function Settings() {
   };
 
   // Check if apiStatus and apiStatus.status exist before using them
-  const isConnected = apiStatus?.status?.wordpress?.connected || false;
-  const wordpressStatus = apiStatus?.status?.wordpress?.message || "Unknown status";
+  const isConnected = apiStatus?.data?.status?.wordpress?.connected || false;
+  const wordpressStatus = apiStatus?.data?.status?.wordpress?.message || "Unknown status";
   
   return (
     <div className="space-y-6">
@@ -230,7 +231,7 @@ export default function Settings() {
             ) : apiStatus.isError ? (
               <XCircle className="h-5 w-5 text-red-500" />
             ) : apiStatus.data?.woocommerce?.isAuthenticated ? (
-              <CheckCircledIcon className="h-5 w-5 text-green-500" />
+              <CheckCircleIcon className="h-5 w-5 text-green-500" />
             ) : (
               <CircleSlash className="h-5 w-5 text-yellow-500" />
             )}
@@ -250,7 +251,7 @@ export default function Settings() {
             ) : apiStatus.isError ? (
               <XCircle className="h-5 w-5 text-red-500" />
             ) : isConnected ? (
-              <CheckCircledIcon className="h-5 w-5 text-green-500" />
+              <CheckCircleIcon className="h-5 w-5 text-green-500" />
             ) : (
               <CircleSlash className="h-5 w-5 text-yellow-500" />
             )}
@@ -262,7 +263,7 @@ export default function Settings() {
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span>Lỗi</span>
               </div>
-              <p>{apiStatus.error.message}</p>
+              <p>{String(apiStatus.error)}</p>
             </div>
           )}
         </CardContent>
