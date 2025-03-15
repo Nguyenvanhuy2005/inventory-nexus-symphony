@@ -7,12 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
+import { Search, Filter, ArrowUpDown, ExternalLink, RefreshCw, PlusCircle } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product } from "@/types/models";
 import { toast } from "sonner";
-import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
-import { useGetStockLevels } from "@/hooks/api-hooks";
+import { fetchWooCommerce, fetchCustomAPI, fetchStockLevels, syncProductsWithStockLevels } from "@/lib/api-utils";
+import { Link } from "react-router-dom";
 
 // Format currency
 const formatCurrency = (value: string | undefined) => {
@@ -25,36 +25,51 @@ const formatCurrency = (value: string | undefined) => {
 };
 
 export default function Inventory() {
-  // Use useQuery directly to fetch products from WooCommerce
-  const { data: products, isLoading: isLoadingProducts, refetch: refetchProducts } = useQuery({
-    queryKey: ['products'],
+  // Use useQuery to fetch products from WooCommerce
+  const { data: products, isLoading: isLoadingProducts, refetch: refetchProducts, error: productsError } = useQuery({
+    queryKey: ['woocommerce-products'],
     queryFn: async () => {
-      const response = await fetchWooCommerce('/products?per_page=100');
-      return response as Product[];
-    }
+      try {
+        // Fetch products with proper pagination, sorting, etc.
+        const response = await fetchWooCommerce('/products', {
+          params: { 
+            per_page: '100',
+            status: 'publish'
+          }
+        });
+        console.log("WooCommerce products fetched:", response);
+        return response as Product[];
+      } catch (error) {
+        console.error("Error fetching WooCommerce products:", error);
+        toast.error("Không thể lấy dữ liệu sản phẩm từ WooCommerce");
+        throw error;
+      }
+    },
+    retry: 1
   });
   
-  // Use existing hook to get stock levels from custom API
-  const { data: stockLevels, isLoading: isLoadingStockLevels, refetch: refetchStockLevels } = useGetStockLevels();
+  // Use useQuery to fetch stock levels from custom API
+  const { data: stockLevels, isLoading: isLoadingStockLevels, refetch: refetchStockLevels, error: stockLevelsError } = useQuery({
+    queryKey: ['custom-stock-levels'],
+    queryFn: async () => {
+      try {
+        const response = await fetchStockLevels();
+        console.log("Stock levels fetched:", response);
+        return response;
+      } catch (error) {
+        console.error("Error fetching stock levels:", error);
+        toast.error("Không thể lấy dữ liệu tồn kho từ hệ thống");
+        return [];
+      }
+    },
+    retry: 1
+  });
   
   const [tab, setTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   
   // Combine products with stock levels
-  const productsWithStock = products?.map(product => {
-    const stockLevel = stockLevels?.find(sl => sl.product_id === product.id);
-    return {
-      ...product,
-      // Tồn kho thực tế: lấy từ bảng hmm_stock_levels nếu có, không thì lấy từ WooCommerce
-      real_stock: stockLevel?.ton_thuc_te !== undefined ? stockLevel.ton_thuc_te : product.stock_quantity,
-      // Đơn đang xử lý: số lượng đặt hàng đang chờ xử lý, lấy từ meta_data hoặc mặc định là 0
-      pending_orders: product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0,
-      // Có thể bán: lấy từ bảng hmm_stock_levels nếu có, không thì tính bằng tồn kho - đơn đang xử lý
-      available_to_sell: stockLevel?.co_the_ban !== undefined 
-        ? stockLevel.co_the_ban 
-        : (product.stock_quantity || 0) - (product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0)
-    };
-  });
+  const productsWithStock = syncProductsWithStockLevels(products, stockLevels);
   
   // Filter products based on tab and search term
   const filteredProducts = productsWithStock?.filter(product => {
@@ -75,6 +90,7 @@ export default function Inventory() {
   });
   
   const isLoading = isLoadingProducts || isLoadingStockLevels;
+  const hasError = productsError || stockLevelsError;
 
   // Function to refresh data
   const refreshData = async () => {
@@ -148,9 +164,16 @@ export default function Inventory() {
                 Thông tin dữ liệu
               </Button>
             </div>
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={() => window.location.href = "https://hmm.vn/wp-admin/post-new.php?post_type=product"}>
-                Thêm sản phẩm trên WooCommerce
+            <div className="flex justify-end space-x-2">
+              <Link to="/inventory/add-product">
+                <Button>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Thêm sản phẩm mới
+                </Button>
+              </Link>
+              <Button variant="outline" onClick={() => window.open("https://hmm.vn/wp-admin/post-new.php?post_type=product")}>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                WooCommerce
               </Button>
             </div>
           </div>
@@ -166,6 +189,7 @@ export default function Inventory() {
               <ProductsTable 
                 products={filteredProducts} 
                 isLoading={isLoading}
+                hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
                 getWooProductUrl={getWooProductUrl}
               />
@@ -174,6 +198,7 @@ export default function Inventory() {
               <ProductsTable 
                 products={filteredProducts} 
                 isLoading={isLoading}
+                hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
                 getWooProductUrl={getWooProductUrl}
               />
@@ -182,6 +207,7 @@ export default function Inventory() {
               <ProductsTable 
                 products={filteredProducts} 
                 isLoading={isLoading}
+                hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
                 getWooProductUrl={getWooProductUrl}
               />
@@ -190,6 +216,7 @@ export default function Inventory() {
               <ProductsTable 
                 products={filteredProducts} 
                 isLoading={isLoading}
+                hasError={hasError}
                 getStockStatusBadge={getStockStatusBadge}
                 getWooProductUrl={getWooProductUrl}
               />
@@ -204,11 +231,22 @@ export default function Inventory() {
 interface ProductsTableProps {
   products: (Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number })[] | undefined;
   isLoading: boolean;
+  hasError: boolean;
   getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => JSX.Element;
   getWooProductUrl: (productId: number) => string;
 }
 
-function ProductsTable({ products, isLoading, getStockStatusBadge, getWooProductUrl }: ProductsTableProps) {
+function ProductsTable({ products, isLoading, hasError, getStockStatusBadge, getWooProductUrl }: ProductsTableProps) {
+  if (hasError) {
+    return (
+      <div className="py-12 text-center">
+        <div className="text-xl font-semibold text-red-500 mb-4">Lỗi kết nối API</div>
+        <p className="text-muted-foreground mb-6">Không thể kết nối đến API WooCommerce hoặc API tùy chỉnh.</p>
+        <p className="text-muted-foreground mb-6">Vui lòng kiểm tra kết nối mạng hoặc cấu hình API.</p>
+      </div>
+    );
+  }
+
   return (
     <Table>
       <TableHeader>
@@ -276,10 +314,14 @@ function ProductsTable({ products, isLoading, getStockStatusBadge, getWooProduct
               <TableCell>{getStockStatusBadge(product)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end space-x-2">
+                  <Link to={`/inventory/product/${product.id}`}>
+                    <Button variant="ghost" size="sm">
+                      Sửa
+                    </Button>
+                  </Link>
                   <a href={getWooProductUrl(product.id)} target="_blank" rel="noopener noreferrer">
                     <Button variant="ghost" size="sm">
-                      <ExternalLink className="mr-1 h-4 w-4" />
-                      Chi tiết
+                      <ExternalLink className="h-4 w-4" />
                     </Button>
                   </a>
                 </div>

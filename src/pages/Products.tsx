@@ -1,18 +1,42 @@
 
 import { useState } from "react";
-import { useGetProducts } from "@/hooks/use-mock-data";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, ArrowUpDown, Edit, Trash } from "lucide-react";
+import { Search, Plus, Filter, ArrowUpDown, Edit, Trash, RefreshCw } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { formatCurrency } from "@/lib/utils";
-import { Product } from "@/lib/woocommerce";
+import { Product } from "@/types/models";
+import { fetchWooCommerce } from "@/lib/api-utils";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function Products() {
-  const { data: products, isLoading } = useGetProducts();
+  // Use useQuery to fetch products directly from WooCommerce
+  const { data: products, isLoading, refetch, error } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      try {
+        const response = await fetchWooCommerce('/products', {
+          params: { 
+            per_page: '100',
+            status: 'publish'
+          }
+        });
+        console.log("Products fetched:", response);
+        return response as Product[];
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        toast.error("Không thể lấy dữ liệu sản phẩm");
+        throw error;
+      }
+    },
+    retry: 1
+  });
+  
   const [searchTerm, setSearchTerm] = useState("");
   
   // Filter products based on search term
@@ -20,6 +44,17 @@ export default function Products() {
     return product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()));
   });
+
+  // Function to refresh data
+  const refreshData = async () => {
+    toast.info("Đang tải lại dữ liệu sản phẩm...");
+    try {
+      await refetch();
+      toast.success("Dữ liệu sản phẩm đã được tải lại thành công");
+    } catch (error) {
+      toast.error("Không thể tải lại dữ liệu sản phẩm");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -45,11 +80,16 @@ export default function Products() {
               <Button variant="outline" size="icon">
                 <Filter className="h-4 w-4" />
               </Button>
+              <Button variant="outline" size="icon" onClick={refreshData}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
-            <Button className="shrink-0">
-              <Plus className="mr-2 h-4 w-4" />
-              Sản phẩm mới
-            </Button>
+            <Link to="/inventory/add-product">
+              <Button className="shrink-0">
+                <Plus className="mr-2 h-4 w-4" />
+                Sản phẩm mới
+              </Button>
+            </Link>
           </div>
           
           <Table className="mt-4">
@@ -75,6 +115,12 @@ export default function Products() {
                     </div>
                   </TableCell>
                 </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center">
+                    <div className="text-red-500">Có lỗi khi tải dữ liệu sản phẩm. Vui lòng thử lại sau.</div>
+                  </TableCell>
+                </TableRow>
               ) : filteredProducts?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center">
@@ -87,7 +133,7 @@ export default function Products() {
                     <TableCell className="font-medium">{product.sku || "-"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {product.images[0] && (
+                        {product.images?.[0] && (
                           <img 
                             src={product.images[0].src} 
                             alt={product.name} 
@@ -104,7 +150,7 @@ export default function Products() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {product.categories.length > 0 
+                      {product.categories?.length > 0 
                         ? product.categories.map(cat => cat.name).join(', ') 
                         : '-'}
                     </TableCell>
@@ -119,9 +165,11 @@ export default function Products() {
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="ghost" size="icon">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <Link to={`/inventory/product/${product.id}`}>
+                        <Button variant="ghost" size="icon">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Button variant="ghost" size="icon">
                         <Trash className="h-4 w-4" />
                       </Button>

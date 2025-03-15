@@ -1,3 +1,4 @@
+
 export interface Supplier {
   id: number;
   name: string;
@@ -127,7 +128,6 @@ export interface CustomerDebt {
   updated_at?: string;
 }
 
-// Make Product interface match the woocommerce.ts definition
 export interface Product {
   id: number;
   name: string;
@@ -138,7 +138,7 @@ export interface Product {
   stock_quantity?: number;
   stock_status?: string;
   categories?: Array<{id: number, name: string}>;
-  images: Array<{id: number, src: string}>; // Made 'id' required and images non-optional
+  images: Array<{id: number, src: string}>; 
   attributes?: any[];
   variations?: number[];
   description?: string;

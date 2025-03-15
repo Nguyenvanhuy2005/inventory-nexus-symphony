@@ -1,7 +1,6 @@
-
 import { toast } from "sonner";
 
-// Mock data for WooCommerce API fallback
+// Mock data for WooCommerce API fallback - only used for development and debugging
 export const mockWooCommerceData = {
   products: [
     { id: 1, name: "Sample Product 1", price: "100000", stock_quantity: 10, images: [{ id: 1, src: "/placeholder.svg" }] },
@@ -113,14 +112,26 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    // Use proper fallback URL
+    // Use proper WooCommerce API URL
     const baseUrl = process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL || 'https://hmm.vn/wp-json/wc/v3';
-    const url = `${baseUrl}${endpoint}`;
-    console.info(`Fetching WooCommerce API: ${endpoint}`);
+    
+    // Build URL with params if they exist
+    let url = `${baseUrl}${endpoint}`;
+    if (options.params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        searchParams.append(key, value as string);
+      });
+      url += `?${searchParams.toString()}`;
+    }
+    
+    console.info(`Fetching WooCommerce API: ${url}`);
     
     const response = await fetch(url, fetchOptions);
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`WooCommerce API error (${response.status}):`, errorText);
       throw new Error(`WooCommerce API request failed: ${response.status}`);
     }
     
@@ -129,19 +140,8 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
   } catch (error) {
     console.error(`Error fetching from WooCommerce API (${endpoint}):`, error);
     
-    // For GET requests on products/orders, use mock data as fallback
-    if (options.method === 'GET' || !options.method) {
-      if (endpoint.includes('/products')) {
-        console.info('Using mock product data as fallback');
-        return mockWooCommerceData.products;
-      } else if (endpoint.includes('/orders')) {
-        console.info('Using mock order data as fallback');
-        return mockWooCommerceData.orders;
-      }
-    }
-    
-    // Don't show toast for GET requests to avoid flooding the UI
-    if (!options.suppressToast && options.method && options.method !== 'GET') {
+    // Don't use mock data anymore - let error propagate to caller
+    if (!options.suppressToast) {
       toast.error(`Lỗi WooCommerce API: ${error instanceof Error ? error.message : 'Không thể kết nối tới máy chủ'}`);
     }
     throw error;
@@ -298,4 +298,43 @@ export async function getWordPressUsers() {
     console.error('Error fetching WordPress users:', error);
     return [];
   }
+}
+
+/**
+ * Fetch stock levels from the custom API
+ * @returns Promise with stock levels data
+ */
+export async function fetchStockLevels() {
+  try {
+    return await fetchCustomAPI('/stock-levels');
+  } catch (error) {
+    console.error('Error fetching stock levels:', error);
+    return [];
+  }
+}
+
+/**
+ * Sync WooCommerce products with stock levels
+ * @param products WooCommerce products
+ * @param stockLevels Custom stock levels
+ * @returns Products with merged stock data
+ */
+export function syncProductsWithStockLevels(products, stockLevels) {
+  if (!products || !Array.isArray(products)) return [];
+  if (!stockLevels || !Array.isArray(stockLevels)) return products;
+  
+  return products.map(product => {
+    const stockLevel = stockLevels.find(sl => sl.product_id === product.id);
+    return {
+      ...product,
+      // Tồn kho thực tế: lấy từ bảng hmm_stock_levels nếu có, không thì lấy từ WooCommerce
+      real_stock: stockLevel?.ton_thuc_te !== undefined ? stockLevel.ton_thuc_te : product.stock_quantity,
+      // Đơn đang xử lý: số lượng đặt hàng đang chờ xử lý, lấy từ meta_data hoặc mặc định là 0
+      pending_orders: product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0,
+      // Có thể bán: lấy từ bảng hmm_stock_levels nếu có, không thì tính bằng tồn kho - đơn đang xử lý
+      available_to_sell: stockLevel?.co_the_ban !== undefined 
+        ? stockLevel.co_the_ban 
+        : (product.stock_quantity || 0) - (product.meta_data?.find(meta => meta.key === 'pending_orders')?.value || 0)
+    };
+  });
 }
