@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +11,16 @@ import { useCheckAPIStatus } from "@/hooks/api-hooks";
 import { fetchWordPress, getWordPressUsers } from "@/lib/api-utils";
 import { toast } from "sonner";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { DEFAULT_WOOCOMMERCE_CREDENTIALS, DEFAULT_WORDPRESS_CREDENTIALS } from "@/lib/auth-utils";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("general");
   const [apiKeys, setApiKeys] = useState({
-    woocommerce_consumer_key: localStorage.getItem('woocommerce_consumer_key') || '',
-    woocommerce_consumer_secret: localStorage.getItem('woocommerce_consumer_secret') || '',
+    woocommerce_consumer_key: localStorage.getItem('woocommerce_consumer_key') || DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_key,
+    woocommerce_consumer_secret: localStorage.getItem('woocommerce_consumer_secret') || DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_secret,
     custom_api_key: localStorage.getItem('custom_api_key') || '',
+    wordpress_username: localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username,
+    wordpress_application_password: localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password,
   });
   
   const [apiUrls, setApiUrls] = useState({
@@ -50,7 +52,6 @@ export default function Settings() {
   
   const { data: apiStatus, isLoading: isLoadingStatus, refetch: refetchApiStatus } = useCheckAPIStatus();
   
-  // Load WordPress users
   useEffect(() => {
     loadWpUsers();
   }, []);
@@ -69,13 +70,13 @@ export default function Settings() {
     }
   };
   
-  // Handle API keys save
   const saveApiKeys = () => {
     localStorage.setItem('woocommerce_consumer_key', apiKeys.woocommerce_consumer_key);
     localStorage.setItem('woocommerce_consumer_secret', apiKeys.woocommerce_consumer_secret);
     localStorage.setItem('custom_api_key', apiKeys.custom_api_key);
+    localStorage.setItem('wordpress_username', apiKeys.wordpress_username);
+    localStorage.setItem('wordpress_application_password', apiKeys.wordpress_application_password);
     
-    // Set environment variables
     if (typeof window !== 'undefined') {
       (window as any).process = {
         ...(window as any).process,
@@ -92,12 +93,10 @@ export default function Settings() {
     setTimeout(() => refetchApiStatus(), 500);
   };
   
-  // Handle API URLs save
   const saveApiUrls = () => {
     localStorage.setItem('api_url', apiUrls.api_url);
     localStorage.setItem('woocommerce_api_url', apiUrls.woocommerce_api_url);
     
-    // Set environment variables
     if (typeof window !== 'undefined') {
       (window as any).process = {
         ...(window as any).process,
@@ -113,7 +112,6 @@ export default function Settings() {
     setTimeout(() => refetchApiStatus(), 500);
   };
   
-  // Handle general settings save
   const saveGeneralSettings = () => {
     localStorage.setItem('default_currency', generalSettings.default_currency);
     localStorage.setItem('default_language', generalSettings.default_language);
@@ -124,7 +122,6 @@ export default function Settings() {
     toast.success('Đã lưu cài đặt chung');
   };
   
-  // Handle inventory settings save
   const saveInventorySettings = () => {
     localStorage.setItem('low_stock_threshold', inventorySettings.low_stock_threshold);
     localStorage.setItem('enable_auto_order', inventorySettings.enable_auto_order.toString());
@@ -137,11 +134,22 @@ export default function Settings() {
     toast.success('Đã lưu cài đặt tồn kho');
   };
   
-  // Handle user selection
   const handleUserChange = (value: string) => {
     setSelectedUser(value);
     localStorage.setItem('selected_user', value);
     toast.success('Đã chọn người dùng mặc định');
+  };
+  
+  const resetApiKeysToDefault = () => {
+    setApiKeys({
+      ...apiKeys,
+      woocommerce_consumer_key: DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_key,
+      woocommerce_consumer_secret: DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_secret,
+      wordpress_username: DEFAULT_WORDPRESS_CREDENTIALS.username,
+      wordpress_application_password: DEFAULT_WORDPRESS_CREDENTIALS.application_password,
+    });
+    
+    toast.info('Đã khôi phục khóa API mặc định. Nhấn "Lưu khóa API" để áp dụng.');
   };
   
   return (
@@ -171,7 +179,6 @@ export default function Settings() {
           </TabsTrigger>
         </TabsList>
         
-        {/* General Settings */}
         <TabsContent value="general">
           <Card>
             <CardHeader>
@@ -258,7 +265,6 @@ export default function Settings() {
           </Card>
         </TabsContent>
         
-        {/* API Settings */}
         <TabsContent value="api">
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
             <Card>
@@ -293,17 +299,17 @@ export default function Settings() {
                     </div>
                     
                     <div className="flex items-start gap-2">
-                      {apiStatus?.isConnected ? (
+                      {apiStatus?.woocommerce?.isConnected ? (
                         <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                       ) : (
                         <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
                       )}
                       <div>
                         <p className="font-medium">
-                          WooCommerce API: {apiStatus?.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
+                          WooCommerce API: {apiStatus?.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {apiStatus?.error || 'Không có thông tin lỗi'}
+                          {apiStatus?.woocommerce?.error || 'Không có thông tin lỗi'}
                         </p>
                       </div>
                     </div>
@@ -324,9 +330,9 @@ export default function Settings() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Khóa API</CardTitle>
+                <CardTitle>Khóa API WooCommerce</CardTitle>
                 <CardDescription>
-                  Cài đặt khóa API cho WooCommerce và WordPress
+                  Cài đặt khóa API cho WooCommerce
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -334,7 +340,6 @@ export default function Settings() {
                   <Label htmlFor="woocommerce_consumer_key">WooCommerce Consumer Key</Label>
                   <Input
                     id="woocommerce_consumer_key"
-                    type="password"
                     value={apiKeys.woocommerce_consumer_key}
                     onChange={(e) => setApiKeys({...apiKeys, woocommerce_consumer_key: e.target.value})}
                   />
@@ -344,14 +349,47 @@ export default function Settings() {
                   <Label htmlFor="woocommerce_consumer_secret">WooCommerce Consumer Secret</Label>
                   <Input
                     id="woocommerce_consumer_secret"
-                    type="password"
                     value={apiKeys.woocommerce_consumer_secret}
                     onChange={(e) => setApiKeys({...apiKeys, woocommerce_consumer_secret: e.target.value})}
                   />
                 </div>
                 
+                <div className="flex gap-2">
+                  <Button onClick={saveApiKeys} className="flex-1">Lưu khóa API</Button>
+                  <Button onClick={resetApiKeysToDefault} variant="outline" className="flex-1">Khôi phục mặc định</Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Khóa API WordPress</CardTitle>
+                <CardDescription>
+                  Cài đặt khóa API cho WordPress
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="custom_api_key">WordPress API Key</Label>
+                  <Label htmlFor="wordpress_username">WordPress Username</Label>
+                  <Input
+                    id="wordpress_username"
+                    value={apiKeys.wordpress_username}
+                    onChange={(e) => setApiKeys({...apiKeys, wordpress_username: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="wordpress_application_password">WordPress Application Password</Label>
+                  <Input
+                    id="wordpress_application_password"
+                    type="password"
+                    value={apiKeys.wordpress_application_password}
+                    onChange={(e) => setApiKeys({...apiKeys, wordpress_application_password: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="custom_api_key">Custom API Key (Nếu cần)</Label>
                   <Input
                     id="custom_api_key"
                     type="password"
@@ -360,7 +398,10 @@ export default function Settings() {
                   />
                 </div>
                 
-                <Button onClick={saveApiKeys} className="w-full">Lưu khóa API</Button>
+                <div className="flex gap-2">
+                  <Button onClick={saveApiKeys} className="flex-1">Lưu khóa API</Button>
+                  <Button onClick={resetApiKeysToDefault} variant="outline" className="flex-1">Khôi phục mặc định</Button>
+                </div>
               </CardContent>
             </Card>
             
@@ -400,7 +441,6 @@ export default function Settings() {
           </div>
         </TabsContent>
         
-        {/* Inventory Settings */}
         <TabsContent value="inventory">
           <Card>
             <CardHeader>
@@ -507,7 +547,6 @@ export default function Settings() {
           </Card>
         </TabsContent>
         
-        {/* User Settings */}
         <TabsContent value="users">
           <Card>
             <CardHeader>

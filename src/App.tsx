@@ -21,7 +21,7 @@ import ProductDetail from "./pages/ProductDetail";
 import StockAdjustments from "./pages/StockAdjustments";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { getAuthStatus } from "./lib/auth-utils";
+import { getAuthStatus, initializeDefaultCredentials } from "./lib/auth-utils";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient({
@@ -34,8 +34,11 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Check authentication status on app start
+  // Initialize default credentials and check authentication status on app start
   useEffect(() => {
+    // Initialize default credentials
+    initializeDefaultCredentials();
+    
     const checkAuth = async () => {
       const authStatus = await getAuthStatus();
       
@@ -59,6 +62,13 @@ const App = () => {
               label: "Đi tới Cài đặt",
               onClick: () => window.location.href = "/settings",
             },
+          }
+        );
+      } else {
+        toast.success(
+          "Kết nối WooCommerce thành công!",
+          {
+            duration: 3000,
           }
         );
       }
