@@ -4,6 +4,23 @@ import { checkAPIStatus } from "@/lib/api-utils";
 import { checkWooCommerceAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
 import { fetchWooCommerce } from "@/lib/api-utils";
 import { toast } from "sonner";
+import { PaymentReceipt, Product, ProductVariation, StockTransaction } from "@/types/models";
+
+// Define types for the return values of our query hooks
+type ApiStatus = {
+  isConnected: boolean;
+  version?: string;
+  error?: string | null;
+  woocommerce: {
+    isConnected: boolean;
+    error: string | null;
+  }
+};
+
+type ProductWithVariations = {
+  product: Product | null;
+  variations: ProductVariation[];
+};
 
 /**
  * Hook to check API connection status
@@ -25,7 +42,7 @@ export function useCheckAPIStatus() {
           isConnected: woocommerceStatus,
           error: woocommerceStatus ? null : 'Không thể xác thực với WooCommerce API'
         }
-      };
+      } as ApiStatus;
     },
     refetchOnWindowFocus: false,
     refetchInterval: false,
@@ -73,10 +90,10 @@ export function useGetProducts(params?: Record<string, string>) {
         return await fetchWooCommerce('/products', { 
           params: params || { per_page: '100' },
           suppressToast: true
-        });
+        }) as Product[];
       } catch (error) {
         console.error('Error fetching products:', error);
-        return [];
+        return [] as Product[];
       }
     },
     refetchOnWindowFocus: false
@@ -89,14 +106,14 @@ export function useGetProducts(params?: Record<string, string>) {
 export function useGetProductWithVariations(productId: number | string | null) {
   const enabled = !!productId;
   
-  return useQuery({
+  return useQuery<ProductWithVariations, Error>({
     queryKey: ['product', productId],
     queryFn: async () => {
-      if (!productId) return null;
+      if (!productId) return { product: null, variations: [] };
       
       try {
         const product = await fetchWooCommerce(`/products/${productId}`);
-        let variations = [];
+        let variations: ProductVariation[] = [];
         
         if (product.type === 'variable') {
           variations = await fetchWooCommerce(`/products/${productId}/variations`);
@@ -105,7 +122,7 @@ export function useGetProductWithVariations(productId: number | string | null) {
         return { product, variations };
       } catch (error) {
         console.error(`Error fetching product ${productId}:`, error);
-        return null;
+        return { product: null, variations: [] };
       }
     },
     enabled
@@ -194,6 +211,48 @@ export function useGetCustomers(params?: Record<string, string>) {
   });
 }
 
+/**
+ * Hook to get payment receipt by ID
+ */
+export function useGetPaymentReceipt(receiptId?: number) {
+  const enabled = !!receiptId && receiptId > 0;
+  
+  return useQuery<PaymentReceipt, Error>({
+    queryKey: ['payment-receipt', receiptId],
+    queryFn: async () => {
+      if (!enabled) return {} as PaymentReceipt;
+      
+      try {
+        // In a real implementation, you would fetch from API
+        console.log(`Fetching payment receipt ${receiptId}`);
+        return {} as PaymentReceipt;
+      } catch (error) {
+        console.error(`Error fetching payment receipt ${receiptId}:`, error);
+        return {} as PaymentReceipt;
+      }
+    },
+    enabled
+  });
+}
+
+/**
+ * Hook to get stock transactions with pagination
+ */
+export function useGetStockTransactions(params?: Record<string, string>) {
+  return useQuery<{ transactions: StockTransaction[], total_pages: number }, Error>({
+    queryKey: ['stock-transactions', params],
+    queryFn: async () => {
+      try {
+        // In a real implementation, this would fetch from an API
+        return { transactions: [], total_pages: 0 };
+      } catch (error) {
+        console.error('Error fetching stock transactions:', error);
+        return { transactions: [], total_pages: 0 };
+      }
+    }
+  });
+}
+
 // Add these stubs to avoid TypeScript errors
 // In a real implementation, these would be fully implemented
 export function useCreateStockAdjustment() {
@@ -242,7 +301,7 @@ export function useGetStockTransactions() {
   return useQuery({
     queryKey: ['stock-transactions'],
     queryFn: async () => {
-      return [];
+      return { transactions: [], total_pages: 0 };
     }
   });
 }
@@ -308,21 +367,11 @@ export function useCreateDamagedStock() {
 }
 
 export function useGetPaymentReceipts() {
-  return useQuery({
+  return useQuery<PaymentReceipt[], Error>({
     queryKey: ['payment-receipts'],
     queryFn: async () => {
       return [];
     }
-  });
-}
-
-export function useGetPaymentReceipt() {
-  return useQuery({
-    queryKey: ['payment-receipt'],
-    queryFn: async () => {
-      return {};
-    },
-    enabled: false
   });
 }
 
@@ -336,8 +385,8 @@ export function useCreatePaymentReceipt() {
 
 export function useUpdateStockLevel() {
   return useMutation({
-    mutationFn: async ({ id, data }: any) => {
-      return { id, ...data };
+    mutationFn: async (data: any) => {
+      return { ...data };
     }
   });
 }
