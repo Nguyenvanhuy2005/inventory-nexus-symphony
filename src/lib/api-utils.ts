@@ -4,12 +4,16 @@ import { toast } from "sonner";
 // Mock data for WooCommerce API fallback
 export const mockWooCommerceData = {
   products: [
-    { id: 1, name: "Sample Product 1", price: "100000", stock_quantity: 10 },
-    { id: 2, name: "Sample Product 2", price: "200000", stock_quantity: 20 }
+    { id: 1, name: "Sample Product 1", price: "100000", stock_quantity: 10, images: [{ id: 1, src: "/placeholder.svg" }] },
+    { id: 2, name: "Sample Product 2", price: "200000", stock_quantity: 20, images: [{ id: 2, src: "/placeholder.svg" }] }
   ],
   orders: [
     { id: 1, status: "processing", total: "100000", customer_id: 1 },
     { id: 2, status: "completed", total: "200000", customer_id: 2 }
+  ],
+  users: [
+    { id: 1, name: "Admin User", email: "admin@example.com" },
+    { id: 2, name: "Manager", email: "manager@example.com" }
   ]
 };
 
@@ -109,7 +113,9 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    const url = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL || 'https://hmm.vn/wp-json/wc/v3'}${endpoint}`;
+    // Use proper fallback URL
+    const baseUrl = process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL || 'https://hmm.vn/wp-json/wc/v3';
+    const url = `${baseUrl}${endpoint}`;
     console.info(`Fetching WooCommerce API: ${endpoint}`);
     
     const response = await fetch(url, fetchOptions);
@@ -177,6 +183,11 @@ export async function fetchWordPress(endpoint: string, options: any = {}) {
     return data;
   } catch (error) {
     console.error(`Error fetching from WordPress API (${endpoint}):`, error);
+    
+    // Fallback for users endpoint
+    if (endpoint.includes('/users')) {
+      return mockWooCommerceData.users;
+    }
     
     // Don't show toast for GET requests to avoid flooding the UI
     if (!options.suppressToast && options.method && options.method !== 'GET') {

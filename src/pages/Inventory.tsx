@@ -1,17 +1,18 @@
 
 import { useState } from "react";
-import { useGetProducts } from "@/hooks/use-mock-data";
-import { useGetStockLevels } from "@/hooks/api-hooks";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, ArrowUpDown, Eye, ExternalLink, RefreshCw } from "lucide-react";
+import { Search, Filter, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import { Product } from "@/lib/woocommerce";
+import { Product } from "@/types/models";
 import { toast } from "sonner";
+import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
+import { useGetStockLevels } from "@/hooks/api-hooks";
 
 // Format currency
 const formatCurrency = (value: string | undefined) => {
@@ -24,8 +25,18 @@ const formatCurrency = (value: string | undefined) => {
 };
 
 export default function Inventory() {
-  const { data: products, isLoading: isLoadingProducts } = useGetProducts();
-  const { data: stockLevels, isLoading: isLoadingStockLevels } = useGetStockLevels();
+  // Use useQuery directly to fetch products from WooCommerce
+  const { data: products, isLoading: isLoadingProducts, refetch: refetchProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const response = await fetchWooCommerce('/products?per_page=100');
+      return response as Product[];
+    }
+  });
+  
+  // Use existing hook to get stock levels from custom API
+  const { data: stockLevels, isLoading: isLoadingStockLevels, refetch: refetchStockLevels } = useGetStockLevels();
+  
   const [tab, setTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -64,6 +75,17 @@ export default function Inventory() {
   });
   
   const isLoading = isLoadingProducts || isLoadingStockLevels;
+
+  // Function to refresh data
+  const refreshData = async () => {
+    toast.info("Đang tải lại dữ liệu...");
+    try {
+      await Promise.all([refetchProducts(), refetchStockLevels()]);
+      toast.success("Dữ liệu đã được tải lại thành công");
+    } catch (error) {
+      toast.error("Không thể tải lại dữ liệu");
+    }
+  };
 
   // Show detailed explanation of data
   const showDataSourceInfo = () => {
@@ -119,8 +141,16 @@ export default function Inventory() {
               <Button variant="outline" size="icon">
                 <Filter className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" onClick={showDataSourceInfo}>
+              <Button variant="outline" size="icon" onClick={refreshData}>
                 <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={showDataSourceInfo}>
+                Thông tin dữ liệu
+              </Button>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => window.location.href = "https://hmm.vn/wp-admin/post-new.php?post_type=product"}>
+                Thêm sản phẩm trên WooCommerce
               </Button>
             </div>
           </div>
@@ -250,12 +280,6 @@ function ProductsTable({ products, isLoading, getStockStatusBadge, getWooProduct
                     <Button variant="ghost" size="sm">
                       <ExternalLink className="mr-1 h-4 w-4" />
                       Chi tiết
-                    </Button>
-                  </a>
-                  <a href={`/inventory/product/${product.id}`}>
-                    <Button variant="ghost" size="sm">
-                      <Eye className="mr-1 h-4 w-4" />
-                      Xem kho
                     </Button>
                   </a>
                 </div>

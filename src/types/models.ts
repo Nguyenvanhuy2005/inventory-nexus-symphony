@@ -152,7 +152,6 @@ export interface Product {
   featured?: boolean;
 }
 
-// Stock interfaces for stock management
 export interface StockLevel {
   product_id: number;
   ton_thuc_te: number;
@@ -177,7 +176,6 @@ export interface StockEntry {
   created_at: string;
 }
 
-// ProductAttribute interface for product attributes
 export interface ProductAttribute {
   id: number;
   name: string;
@@ -187,7 +185,6 @@ export interface ProductAttribute {
   variation: boolean;
 }
 
-// ProductVariation interface for product variations
 export interface ProductVariation {
   id: number;
   product_id: number;

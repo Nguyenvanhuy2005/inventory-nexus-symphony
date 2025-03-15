@@ -1,13 +1,15 @@
 
-import { useState, useEffect } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, Upload } from "lucide-react";
-import { toast } from "sonner";
-import { format } from "date-fns";
-
-import { Button } from "@/components/ui/button";
+import React, { useState, useRef } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { Card } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -15,407 +17,398 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/form';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { Supplier } from "@/types/models";
-import { useNavigate } from "react-router-dom";
-import { fetchCustomAPI, uploadAttachment } from "@/lib/api-utils";
-import { useQuery } from "@tanstack/react-query";
+} from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { CalendarIcon, PaperclipIcon, Upload } from 'lucide-react';
+import { useCreatePaymentReceipt } from '@/hooks/api-hooks';
+import { uploadAttachment } from '@/lib/api-utils';
 
+// Form validation schema
 const formSchema = z.object({
-  entity: z.enum(["supplier", "customer", "other"]),
-  entity_id: z.coerce.number().optional(),
+  entity: z.enum(['customer', 'supplier'], {
+    required_error: 'Vui lòng chọn đối tượng',
+  }),
+  entity_id: z.number({
+    required_error: 'Vui lòng chọn đối tượng',
+  }),
   entity_name: z.string().min(1, {
-    message: "Tên đối tác là bắt buộc",
+    message: 'Vui lòng nhập tên đối tượng',
   }),
-  date: z.date(),
-  type: z.enum(["payment", "receipt"]),
-  amount: z.string().min(1, {
-    message: "Số tiền là bắt buộc",
+  date: z.date({
+    required_error: 'Vui lòng chọn ngày',
   }),
+  amount: z.number({
+    required_error: 'Vui lòng nhập số tiền',
+  }).positive({
+    message: 'Số tiền phải lớn hơn 0',
+  }),
+  payment_method: z.string().min(1, {
+    message: 'Vui lòng chọn phương thức thanh toán',
+  }),
+  type: z.enum(['receipt', 'payment'], {
+    required_error: 'Vui lòng chọn loại phiếu',
+  }),
+  notes: z.string().optional(),
   description: z.string().optional(),
+  attachment_url: z.string().optional(),
 });
 
-// Define the props interface for the component
+type FormValues = z.infer<typeof formSchema>;
+
+// Props interface
 interface CreatePaymentReceiptFormProps {
+  entityOptions?: { id: number; name: string }[];
+  initialEntity?: 'customer' | 'supplier';
+  initialEntityId?: number;
+  initialEntityName?: string;
   onSuccess?: () => void;
+  initialType?: 'receipt' | 'payment';
 }
 
-export default function CreatePaymentReceiptForm({ onSuccess }: CreatePaymentReceiptFormProps) {
-  const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const navigate = useNavigate();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileUploading, setFileUploading] = useState(false);
-
-  // Fetch suppliers data
-  const { data: suppliersData, isLoading: isLoadingSuppliers } = useQuery({
-    queryKey: ["suppliers"],
-    queryFn: async () => {
-      try {
-        const data = await fetchCustomAPI("/suppliers");
-        return data as Supplier[];
-      } catch (error) {
-        console.error("Error fetching suppliers:", error);
-        return [];
-      }
-    }
-  });
-
-  useEffect(() => {
-    if (suppliersData) {
-      setSuppliers(suppliersData);
-    }
-  }, [suppliersData]);
-
-  const form = useForm<z.infer<typeof formSchema>>({
+export default function CreatePaymentReceiptForm({
+  entityOptions = [],
+  initialEntity,
+  initialEntityId,
+  initialEntityName,
+  onSuccess,
+  initialType = 'receipt',
+}: CreatePaymentReceiptFormProps) {
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Setup form with default values
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      entity: "supplier",
-      entity_name: "",
+      entity: initialEntity || 'customer',
+      entity_id: initialEntityId || 0,
+      entity_name: initialEntityName || '',
       date: new Date(),
-      type: "payment",
-      amount: "",
-      description: "",
+      amount: 0,
+      payment_method: 'cash',
+      type: initialType,
+      notes: '',
+      description: '',
+      attachment_url: '',
     },
   });
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    setLoading(true);
+  
+  // Create payment receipt mutation
+  const { mutate: createPaymentReceipt, isPending } = useCreatePaymentReceipt();
+  
+  // Handle file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
     
+    setIsUploading(true);
     try {
-      // First, upload the file if one is selected
-      let attachmentUrl = '';
-      
-      if (selectedFile) {
-        setFileUploading(true);
-        try {
-          // Upload now but don't link to entity yet since we don't have the ID
-          attachmentUrl = await uploadAttachment(selectedFile, "payment_receipt");
-          setFileUploading(false);
-        } catch (error) {
-          console.error("Error uploading file:", error);
-          toast.error("Lỗi khi tải lên tập tin đính kèm");
-          setFileUploading(false);
-          // Continue without attachment
-        }
-      }
-      
-      // Submit the form data to create the payment receipt
-      const response = await fetchCustomAPI("/payment-receipts", {
-        method: "POST",
-        body: {
-          entity: data.entity,
-          entity_id: data.entity_id || 0,
-          entity_name: data.entity_name,
-          date: format(data.date, "yyyy-MM-dd HH:mm:ss"),
-          type: data.type,
-          amount: parseFloat(data.amount),
-          payment_method: "cash" as const,
-          notes: data.description || "",
-          attachment_url: attachmentUrl,
-        },
-      });
-      
-      // If we have a file and it was uploaded successfully, now link it to the entity
-      if (selectedFile && attachmentUrl && response.id) {
-        try {
-          await uploadAttachment(selectedFile, "payment_receipt", response.id);
-        } catch (error) {
-          console.error("Error linking attachment:", error);
-          // We already have the attachment URL saved in the receipt, so continue
-        }
-      }
-      
-      toast.success(
-        data.type === "payment"
-          ? "Đã tạo phiếu chi thành công"
-          : "Đã tạo phiếu thu thành công"
-      );
-      
-      // Call onSuccess prop if provided, otherwise navigate
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        navigate("/payment-receipts");
+      const uploadedFile = await uploadAttachment(file);
+      if (uploadedFile && uploadedFile.source_url) {
+        form.setValue('attachment_url', uploadedFile.source_url);
+        toast.success('Tải lên tệp đính kèm thành công');
       }
     } catch (error) {
-      console.error("Error creating payment receipt:", error);
-      toast.error("Lỗi khi tạo phiếu thu chi");
+      console.error('Error uploading file:', error);
+      toast.error('Không thể tải lên tệp đính kèm');
     } finally {
-      setLoading(false);
+      setIsUploading(false);
     }
   };
-
-  const selectedEntity = form.watch("entity");
-  const selectedEntityId = form.watch("entity_id");
-
-  useEffect(() => {
-    if (selectedEntity === "supplier" && selectedEntityId) {
-      const supplier = suppliers.find((s) => s.id === selectedEntityId);
-      if (supplier) {
-        form.setValue("entity_name", supplier.name);
+  
+  // Handle form submission
+  const onSubmit = (data: FormValues) => {
+    createPaymentReceipt({
+      receipt_id: `PR-${Date.now()}`,
+      entity: data.entity,
+      entity_id: data.entity_id,
+      entity_name: data.entity_name,
+      date: format(data.date, 'yyyy-MM-dd'),
+      amount: data.amount,
+      payment_method: data.payment_method,
+      notes: data.notes || '',
+      type: data.type,
+      description: data.description || '',
+      attachment_url: data.attachment_url,
+    }, {
+      onSuccess: () => {
+        form.reset();
+        if (onSuccess) onSuccess();
       }
-    }
-  }, [selectedEntity, selectedEntityId, suppliers, form]);
-
+    });
+  };
+  
+  // Helper to get entity label
+  const getEntityLabel = () => {
+    return form.watch('entity') === 'customer' ? 'Khách hàng' : 'Nhà cung cấp';
+  };
+  
+  // Helper to get receipt type label
+  const getReceiptTypeLabel = () => {
+    return form.watch('type') === 'receipt' ? 'Phiếu thu' : 'Phiếu chi';
+  };
+  
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Loại phiếu</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn loại phiếu" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="payment">Phiếu chi</SelectItem>
-                    <SelectItem value="receipt">Phiếu thu</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Ngày</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "dd/MM/yyyy")
-                        ) : (
-                          <span>Chọn ngày</span>
-                        )}
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="entity"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Đối tượng</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn đối tượng" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="supplier">Nhà cung cấp</SelectItem>
-                    <SelectItem value="customer">Khách hàng</SelectItem>
-                    <SelectItem value="other">Khác</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {selectedEntity === "supplier" && (
+    <Card className="p-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Receipt Type */}
             <FormField
               control={form.control}
-              name="entity_id"
+              name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Chọn nhà cung cấp</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    value={field.value?.toString() || ""}
+                  <FormLabel>Loại phiếu</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn nhà cung cấp" />
+                        <SelectValue placeholder="Chọn loại phiếu" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {isLoadingSuppliers ? (
-                        <div className="flex items-center justify-center p-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="ml-2">Đang tải...</span>
-                        </div>
-                      ) : (
-                        suppliers.map((supplier) => (
-                          <SelectItem
-                            key={supplier.id}
-                            value={supplier.id.toString()}
-                          >
-                            {supplier.name}
-                          </SelectItem>
-                        ))
-                      )}
+                      <SelectItem value="receipt">Phiếu thu</SelectItem>
+                      <SelectItem value="payment">Phiếu chi</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          )}
-
-          {(selectedEntity !== "supplier" ||
-            (selectedEntity === "supplier" && !selectedEntityId)) && (
+            
+            {/* Entity Type */}
+            <FormField
+              control={form.control}
+              name="entity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Đối tượng</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn đối tượng" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="customer">Khách hàng</SelectItem>
+                      <SelectItem value="supplier">Nhà cung cấp</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Entity Name */}
             <FormField
               control={form.control}
               name="entity_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    {selectedEntity === "supplier"
-                      ? "Tên nhà cung cấp"
-                      : selectedEntity === "customer"
-                      ? "Tên khách hàng"
-                      : "Tên đối tượng"}
-                  </FormLabel>
+                  <FormLabel>Tên {getEntityLabel()}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nhập tên" {...field} />
+                    <Input placeholder={`Nhập tên ${getEntityLabel().toLowerCase()}`} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          )}
-        </div>
-
-        <Card className="bg-accent/50">
-          <CardContent className="pt-6">
-            <div className="grid gap-4">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Số tiền</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Nhập số tiền"
-                        {...field}
-                        type="number"
-                        min="0"
-                        step="1000"
+            
+            {/* Date */}
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Ngày</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className="w-full pl-3 text-left font-normal"
+                        >
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy")
+                          ) : (
+                            <span>Chọn ngày</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ghi chú</FormLabel>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Amount */}
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Số tiền</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Nhập số tiền" 
+                      {...field} 
+                      onChange={e => field.onChange(parseFloat(e.target.value))} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Payment Method */}
+            <FormField
+              control={form.control}
+              name="payment_method"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phương thức thanh toán</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Textarea
-                        placeholder="Nhập ghi chú cho phiếu thu chi"
-                        {...field}
-                      />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn phương thức thanh toán" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-2">
-                <FormLabel>Tập tin đính kèm</FormLabel>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    onChange={onFileChange}
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                    className="max-w-sm"
+                    <SelectContent>
+                      <SelectItem value="cash">Tiền mặt</SelectItem>
+                      <SelectItem value="bank_transfer">Chuyển khoản</SelectItem>
+                      <SelectItem value="card">Thẻ tín dụng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          
+          {/* Description */}
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mô tả</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Nhập mô tả" 
+                    className="resize-none" 
+                    {...field} 
                   />
-                  {selectedFile && (
-                    <div className="text-sm text-muted-foreground">
-                      {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            className="w-full md:w-auto"
-            disabled={loading || fileUploading}
-          >
-            {(loading || fileUploading) && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-            <Plus className="mr-2 h-4 w-4" />
-            {form.watch("type") === "payment"
-              ? "Tạo phiếu chi"
-              : "Tạo phiếu thu"}
+          />
+          
+          {/* Notes */}
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ghi chú</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Nhập ghi chú nội bộ" 
+                    className="resize-none" 
+                    {...field} 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          {/* File Attachment */}
+          <FormField
+            control={form.control}
+            name="attachment_url"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tệp đính kèm</FormLabel>
+                <div className="flex items-center gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                        Đang tải lên...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <PaperclipIcon className="h-4 w-4" />
+                        Đính kèm tệp
+                      </span>
+                    )}
+                  </Button>
+                  {field.value && (
+                    <a 
+                      href={field.value} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-500 hover:underline"
+                    >
+                      Xem tệp đã tải lên
+                    </a>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <Button 
+            type="submit" 
+            disabled={isPending}
+            className="w-full md:w-auto"
+          >
+            {isPending ? (
+              <span className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                Đang xử lý...
+              </span>
+            ) : (
+              `Tạo ${getReceiptTypeLabel()}`
+            )}
           </Button>
-        </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+    </Card>
   );
 }
