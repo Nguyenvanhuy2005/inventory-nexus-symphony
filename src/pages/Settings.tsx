@@ -9,12 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { 
-  CheckCircleIcon, 
+  CheckCircle, 
   CircleSlash, 
   Copy, 
   Loader2, 
   XCircle,
-  CheckCircle2,
   AlertTriangle
 } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -104,9 +103,24 @@ export default function Settings() {
     toast({ description: "Đã sao chép Mật khẩu ứng dụng vào clipboard." });
   };
 
-  // Check if apiStatus and apiStatus.status exist before using them
-  const isConnected = apiStatus?.data?.status?.wordpress?.connected || false;
-  const wordpressStatus = apiStatus?.data?.status?.wordpress?.message || "Unknown status";
+  // Safely access nested properties with optional chaining
+  const isConnected = apiStatus?.data?.status && typeof apiStatus.data.status === 'object' && 
+                      'wordpress' in apiStatus.data.status && 
+                      typeof apiStatus.data.status.wordpress === 'object' && 
+                      'connected' in apiStatus.data.status.wordpress ? 
+                      apiStatus.data.status.wordpress.connected : false;
+                      
+  const wordpressStatus = apiStatus?.data?.status && typeof apiStatus.data.status === 'object' && 
+                         'wordpress' in apiStatus.data.status && 
+                         typeof apiStatus.data.status.wordpress === 'object' && 
+                         'message' in apiStatus.data.status.wordpress ? 
+                         apiStatus.data.status.wordpress.message : "Unknown status";
+
+  // Check WooCommerce authentication status safely
+  const isWooCommerceAuthenticated = apiStatus?.data?.woocommerce && 
+                                    typeof apiStatus.data.woocommerce === 'object' && 
+                                    'isAuthenticated' in apiStatus.data.woocommerce ? 
+                                    apiStatus.data.woocommerce.isAuthenticated : false;
   
   return (
     <div className="space-y-6">
@@ -230,8 +244,8 @@ export default function Settings() {
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : apiStatus.isError ? (
               <XCircle className="h-5 w-5 text-red-500" />
-            ) : apiStatus.data?.woocommerce?.isAuthenticated ? (
-              <CheckCircleIcon className="h-5 w-5 text-green-500" />
+            ) : isWooCommerceAuthenticated ? (
+              <CheckCircle className="h-5 w-5 text-green-500" />
             ) : (
               <CircleSlash className="h-5 w-5 text-yellow-500" />
             )}
@@ -251,7 +265,7 @@ export default function Settings() {
             ) : apiStatus.isError ? (
               <XCircle className="h-5 w-5 text-red-500" />
             ) : isConnected ? (
-              <CheckCircleIcon className="h-5 w-5 text-green-500" />
+              <CheckCircle className="h-5 w-5 text-green-500" />
             ) : (
               <CircleSlash className="h-5 w-5 text-yellow-500" />
             )}

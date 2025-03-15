@@ -46,6 +46,7 @@ const convertWooCommerceProduct = (product: any): ModelProduct => {
     available_to_sell: product.stock_quantity || 0,
     pending_orders: 0,
     attributes: product.attributes || [],
+    variation_id: product.variation_id || 0,
   };
 };
 

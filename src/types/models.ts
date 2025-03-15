@@ -1,4 +1,3 @@
-
 export interface PaymentReceipt {
   id: number;
   receipt_id: string;
@@ -41,6 +40,7 @@ export interface Product {
   available_to_sell?: number;
   pending_orders?: number;
   attributes?: any[];
+  variation_id?: number;
 }
 
 export interface ProductVariation {
