@@ -101,14 +101,11 @@ export default function Settings() {
   };
 
   // Safely check for nested properties with null checks
-  const isConnected = apiStatus.data?.status ? 
-    (apiStatus.data.status.wordpress?.connected || false) : false;
+  const isConnected = apiStatus.data?.status?.wordpress?.connected || false;
                       
-  const wordpressStatus = apiStatus.data?.status ? 
-    (apiStatus.data.status.wordpress?.message || "Unknown status") : "Unknown status";
+  const wordpressStatus = apiStatus.data?.status?.wordpress?.message || "Unknown status";
 
-  const isWooCommerceAuthenticated = apiStatus.data?.woocommerce ? 
-    (apiStatus.data.woocommerce.isAuthenticated || false) : false;
+  const isWooCommerceAuthenticated = apiStatus.data?.woocommerce?.isAuthenticated || false;
   
   return (
     <div className="space-y-6">

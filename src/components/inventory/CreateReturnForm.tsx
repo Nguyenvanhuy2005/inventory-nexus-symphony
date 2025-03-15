@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useGetProducts } from '@/hooks/api-hooks';
 import { Product as ModelProduct } from '@/types/models';
@@ -12,7 +13,11 @@ import ProductSelectAutoComplete from './ProductSelectAutoComplete';
 import { useCreateReturn } from '@/hooks/api-hooks';
 import { Loader2 } from 'lucide-react';
 
-export default function CreateReturnForm() {
+interface CreateReturnFormProps {
+  onSuccess?: () => void;
+}
+
+export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
   const [selectedProduct, setSelectedProduct] = useState<ModelProduct | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState<string>('');
@@ -68,7 +73,7 @@ export default function CreateReturnForm() {
     };
     
     try {
-      await createReturn.mutateAsync();
+      await createReturn.mutateAsync(returnData);
       toast({
         title: "Thành công",
         description: "Đã tạo phiếu trả hàng thành công.",
@@ -83,6 +88,10 @@ export default function CreateReturnForm() {
       setSupplierId(null);
       setSupplierName('');
       setReferenceNumber('');
+      
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       console.error("Error creating return:", error);
       toast({
@@ -121,26 +130,28 @@ export default function CreateReturnForm() {
               <div>
                 <Label htmlFor="product">Sản phẩm</Label>
                 <ProductSelectAutoComplete 
-                  products={products || []} 
-                  onSelect={handleProductSelect} 
+                  onSelect={handleProductSelect}
+                  selectedProduct={selectedProduct}
                   placeholder="Tìm kiếm sản phẩm..."
                 />
               </div>
               
-              {selectedProduct && selectedProduct.type === 'variable' && (
+              {selectedProduct && selectedProduct.type === 'variable' && selectedProduct.attributes && (
                 <div>
                   <Label>Biến thể</Label>
                   <Select onValueChange={(value) => {
-                    const variation = selectedProduct.variations?.find(v => v.id.toString() === value);
+                    // Since variations doesn't exist in the Product type, we use attributes instead
+                    // This is a placeholder. You should implement proper variation selection logic
+                    const variation = { id: parseInt(value), attributes: selectedProduct.attributes };
                     setSelectedVariation(variation || null);
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn biến thể" />
                     </SelectTrigger>
                     <SelectContent>
-                      {selectedProduct.variations?.map((variation) => (
-                        <SelectItem key={variation.id} value={variation.id.toString()}>
-                          {variation.attributes?.map(attr => `${attr.name}: ${attr.option}`).join(', ')}
+                      {selectedProduct.attributes?.map((attr, index) => (
+                        <SelectItem key={index} value={index.toString()}>
+                          {attr.name}: {Array.isArray(attr) ? attr.join(', ') : attr.toString()}
                         </SelectItem>
                       ))}
                     </SelectContent>

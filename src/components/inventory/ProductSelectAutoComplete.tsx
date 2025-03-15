@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/popover";
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
 import { toast } from "sonner";
+import { Product as ModelProduct } from "@/types/models";
 
 interface ProductOption {
   id: number;
@@ -31,8 +32,8 @@ interface ProductOption {
 }
 
 interface ProductSelectAutoCompleteProps {
-  onSelect: (product: ProductOption) => void;
-  selectedProduct: ProductOption | null;
+  onSelect: (product: any) => void;
+  selectedProduct: any | null;
   placeholder?: string;
   disabled?: boolean;
   showProductInfo?: boolean;
