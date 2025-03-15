@@ -37,8 +37,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Edit, ExternalLink, InfoIcon, ShoppingCart } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { Product, ProductVariation } from "@/types/models";
 
-// Format currency
 const formatCurrency = (value: string | undefined) => {
   if (!value) return "0 ₫";
   return new Intl.NumberFormat('vi-VN', {
@@ -59,11 +59,9 @@ export default function ProductDetail() {
   const [realStock, setRealStock] = useState<number>(0);
   const [availableStock, setAvailableStock] = useState<number>(0);
 
-  // Extract product and variations from the data
   const product = data?.product;
   const variations = data?.variations || [];
 
-  // Initialize stock values when product data is loaded
   useEffect(() => {
     if (product) {
       setRealStock(product.real_stock || product.stock_quantity || 0);
@@ -82,7 +80,6 @@ export default function ProductDetail() {
     };
 
     try {
-      // Determine if we need to create or update
       if (product?.real_stock !== undefined) {
         await updateStockLevel.mutateAsync(stockData);
       } else {
@@ -93,8 +90,7 @@ export default function ProductDetail() {
       console.error("Error updating stock:", error);
     }
   };
-  
-  // Get WooCommerce product URL
+
   const getWooProductUrl = (productId: number) => {
     return `https://hmm.vn/wp-admin/post.php?post=${productId}&action=edit`;
   };
@@ -121,7 +117,7 @@ export default function ProductDetail() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">
-              Không thể tải thông tin sản phẩm. Vui lòng thử lại sau.
+              Không thể tải thông tin sản phẩm. Vui lòng thử l��i sau.
             </p>
           </CardContent>
         </Card>
@@ -237,21 +233,19 @@ export default function ProductDetail() {
                 </div>
                 
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Thuộc tính sản phẩm</h3>
-                  <div className="mt-2">
-                    {product.attributes && product.attributes.length > 0 ? (
-                      <dl className="divide-y divide-gray-100">
-                        {product.attributes.map((attr, index) => (
-                          <div key={index} className="flex justify-between py-2">
-                            <dt className="text-sm font-medium">{attr.name}</dt>
-                            <dd className="text-sm">{Array.isArray(attr.options) ? attr.options.join(', ') : attr.options}</dd>
+                  {product.attributes && product.attributes.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-base font-medium mb-2">Thuộc tính sản phẩm</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {product.attributes.map((attr: any, index: number) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{attr.name}:</span>
+                            <span>{attr.options.join(', ')}</span>
                           </div>
                         ))}
-                      </dl>
-                    ) : (
-                      <p className="text-muted-foreground">Không có thuộc tính</p>
-                    )}
-                  </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -391,15 +385,11 @@ export default function ProductDetail() {
                         {variation.image ? (
                           <img 
                             src={variation.image.src} 
-                            alt={variation.sku || "Biến thể"} 
-                            className="h-8 w-8 rounded object-cover" 
+                            alt={variation.name || ''} 
+                            className="h-8 w-8 rounded-md object-cover"
                           />
-                        ) : product.images?.[0] && (
-                          <img 
-                            src={product.images[0].src} 
-                            alt={variation.sku || "Biến thể"} 
-                            className="h-8 w-8 rounded object-cover" 
-                          />
+                        ) : (
+                          <Image className="h-8 w-8 rounded-md" />
                         )}
                         <span>{variation.sku || `Biến thể #${variation.id}`}</span>
                       </div>

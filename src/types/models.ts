@@ -2,7 +2,7 @@
 export interface PaymentReceipt {
   id: number;
   receipt_id: string;
-  type: 'income' | 'expense'; // Changed from 'payment' | 'receipt' to match the usage in code
+  type: 'income' | 'expense';
   entity_type: 'customer' | 'supplier' | 'other';
   entity_id: number;
   entity_name: string;
@@ -29,7 +29,7 @@ export interface Product {
   regular_price?: string;
   sale_price?: string;
   stock_quantity?: number;
-  stock_status?: 'instock' | 'outofstock' | 'onbackorder';
+  stock_status?: 'instock' | 'outofstock' | 'onbackorder' | string;
   description?: string;
   short_description?: string;
   categories?: Array<{ id: number; name: string }>;
@@ -40,6 +40,7 @@ export interface Product {
   real_stock?: number;
   available_to_sell?: number;
   pending_orders?: number;
+  attributes?: any[];
 }
 
 export interface ProductVariation {
@@ -51,8 +52,9 @@ export interface ProductVariation {
   regular_price?: string;
   sale_price?: string;
   stock_quantity?: number;
-  stock_status?: 'instock' | 'outofstock' | 'onbackorder';
+  stock_status?: 'instock' | 'outofstock' | 'onbackorder' | string;
   attributes?: Array<{ name: string; option: string }>;
+  image?: any;
 }
 
 export interface Supplier {
@@ -61,13 +63,16 @@ export interface Supplier {
   email?: string;
   phone?: string;
   address?: string;
-  contact_person?: string;
+  contact_name?: string;
   notes?: string;
   payment_terms?: string;
   tax_id?: string;
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
+  initial_debt?: number;
+  current_debt?: number;
+  total_debt?: number;
 }
 
 export interface GoodsReceipt {
@@ -145,6 +150,7 @@ export interface StockTransaction {
   previous_quantity: number;
   current_quantity: number;
   type: 'goods_receipt' | 'return' | 'sale' | 'adjustment' | 'damaged';
+  transaction_type?: string; // added for compatibility with existing code
   reference_id: string;
   reference_type: 'goods_receipt' | 'return' | 'order' | 'adjustment' | 'damaged';
   notes?: string;

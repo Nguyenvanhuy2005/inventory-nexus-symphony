@@ -1,347 +1,292 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
-
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Trash2 } from 'lucide-react';
-
-import { useGetProductWithVariations, useUpdateProduct, useCreateProduct, useGetProductCategories } from '@/hooks/api-hooks';
-import { Product, ProductVariation } from '@/types/models';
-
-const productFormSchema = z.object({
-  name: z.string().min(2, {
-    message: "Tên sản phẩm phải có ít nhất 2 ký tự.",
-  }),
-  sku: z.string().optional(),
-  price: z.string().regex(/^\d+(\.\d{1,2})?$/, {
-    message: "Giá phải là một số hợp lệ.",
-  }),
-  regular_price: z.string().regex(/^\d+(\.\d{1,2})?$/, {
-    message: "Giá gốc phải là một số hợp lệ.",
-  }).optional(),
-  sale_price: z.string().regex(/^\d+(\.\d{1,2})?$/, {
-    message: "Giá khuyến mãi phải là một số hợp lệ.",
-  }).optional(),
-  stock_quantity: z.number().optional(),
-  stock_status: z.string().optional(),
-  description: z.string().optional(),
-  short_description: z.string().optional(),
-  categories: z.array(z.string()).optional(),
-  manage_stock: z.boolean().default(false),
-  featured: z.boolean().default(false),
-});
-
-type ProductFormValues = z.infer<typeof productFormSchema>;
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { useGetProductWithVariations, useCreateProduct, useUpdateProduct, useGetProductCategories } from "@/hooks/api-hooks";
+import { Product, ProductVariation } from "@/types/models";
+import { ImageIcon, ImagePlus, Loader2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { uploadAttachment } from "@/lib/api-utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Image from "next/image";
 
 export default function AddEditProduct() {
   const navigate = useNavigate();
   const { productId } = useParams();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Fetch product data with variations
-  const productWithVariations = useGetProductWithVariations(productId);
-  const productData = productWithVariations.data?.product || null;
-
-  const { data: categoriesData } = useGetProductCategories();
-  const categories = categoriesData || [];
-
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productFormSchema),
-    defaultValues: {
-      name: productData?.name || "",
-      sku: productData?.sku || "",
-      price: productData?.price || "",
-      regular_price: productData?.regular_price || "",
-      sale_price: productData?.sale_price || "",
-      stock_quantity: productData?.stock_quantity || 0,
-      stock_status: productData?.stock_status || "instock",
-      description: productData?.description || "",
-      short_description: productData?.short_description || "",
-      categories: productData?.categories?.map(cat => cat.id.toString()) || [],
-      manage_stock: productData?.manage_stock || false,
-      featured: productData?.featured || false,
-    },
-    mode: "onChange",
+  const isEditMode = !!productId;
+  
+  const [formData, setFormData] = useState<any>({
+    name: "",
+    description: "",
+    short_description: "",
+    regular_price: "",
+    sale_price: "",
+    stock_quantity: 0,
+    manage_stock: false,
+    categories: [],
+    images: [],
+    attributes: []
   });
-
-  useEffect(() => {
-    if (productData) {
-      form.reset({
-        name: productData.name || "",
-        sku: productData.sku || "",
-        price: productData.price || "",
-        regular_price: productData.regular_price || "",
-        sale_price: productData.sale_price || "",
-        stock_quantity: productData.stock_quantity || 0,
-        stock_status: productData.stock_status || "instock",
-        description: productData.description || "",
-        short_description: productData.short_description || "",
-        categories: productData.categories?.map(cat => cat.id.toString()) || [],
-        manage_stock: productData.manage_stock || false,
-        featured: productData.featured || false,
-      });
-    }
-  }, [productData, form]);
-
-  const updateProduct = useUpdateProduct();
+  
+  const [selectedCategories, setSelectedCategories] = useState<any[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  const { data: productData, isLoading } = useGetProductWithVariations(productId);
   const createProduct = useCreateProduct();
-
-  const handleSubmit = async (data: ProductFormValues) => {
+  const updateProduct = useUpdateProduct();
+  const { data: categoryOptions = [] } = useGetProductCategories();
+  
+  useEffect(() => {
+    if (productData && productData.product) {
+      const product = productData.product;
+      setFormData({
+        name: product.name || "",
+        description: product.description || "",
+        short_description: product.short_description || "",
+        regular_price: product.regular_price || "",
+        sale_price: product.sale_price || "",
+        stock_quantity: product.stock_quantity || 0,
+        manage_stock: product.manage_stock || false,
+        categories: product.categories || [],
+        images: product.images || [],
+        attributes: product.attributes || []
+      });
+      setSelectedCategories(product.categories || []);
+    }
+  }, [productData]);
+  
+  const handleInputChange = (e: any) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  };
+  
+  const handleImageUpload = async (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setIsUploading(true);
+    
     try {
-      setIsSubmitting(true);
-    
-      const productData = {
-        name: data.name,
-        sku: data.sku,
-        price: data.price,
-        regular_price: data.regular_price,
-        sale_price: data.sale_price,
-        stock_quantity: data.stock_quantity,
-        stock_status: data.stock_status,
-        description: data.description,
-        short_description: data.short_description,
-        categories: data.categories ? data.categories.map(catId => parseInt(catId)) : [],
-        manage_stock: data.manage_stock,
-        featured: data.featured,
-      };
-    
-      if (productId) {
-        await updateProduct.mutateAsync({ 
-          id: parseInt(productId as string),
-          data: productData
-        });
-        navigate(`/products/${productId}`);
-      } else {
-        const result = await createProduct.mutateAsync(productData);
-        navigate(`/products/${result.id}`);
-      }
+      const uploadedImage = await uploadAttachment(file);
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, uploadedImage]
+      }));
+      toast.success("Đã tải ảnh lên thành công");
     } catch (error) {
-      console.error('Error saving product:', error);
-      toast.error('Có lỗi xảy ra khi lưu sản phẩm');
+      console.error("Error uploading image:", error);
+      toast.error("Không thể tải ảnh lên");
     } finally {
-      setIsSubmitting(false);
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
-
+  
+  const handleCategoryChange = (e: any) => {
+    const categoryId = parseInt(e.target.value);
+    const category = categoryOptions.find(cat => cat.id === categoryId);
+    
+    if (e.target.checked) {
+      setSelectedCategories(prev => [...prev, category]);
+      setFormData(prev => ({
+        ...prev,
+        categories: [...prev.categories, category]
+      }));
+    } else {
+      setSelectedCategories(prev => prev.filter(cat => cat.id !== categoryId));
+      setFormData(prev => ({
+        ...prev,
+        categories: prev.categories.filter(cat => cat.id !== categoryId)
+      }));
+    }
+  };
+  
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    
+    if (isEditMode) {
+      updateProduct.mutate({
+        id: parseInt(productId!),
+        data: formData
+      });
+    } else {
+      createProduct.mutate(formData);
+    }
+  };
+  
+  if (isLoading) {
+    return <p>Đang tải dữ liệu...</p>;
+  }
+  
   return (
-    <div className="container mx-auto py-10">
-      <Card>
-        <CardHeader>
-          <CardTitle>{productId ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</CardTitle>
-          <CardDescription>Nhập thông tin chi tiết về sản phẩm.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tên sản phẩm</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ví dụ: Gạch ốp lát cao cấp" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+    <div className="space-y-6">
+      <DashboardHeader 
+        title={isEditMode ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
+        description="Quản lý thông tin sản phẩm"
+      />
+      
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Tên sản phẩm</Label>
+            <Input 
+              type="text" 
+              id="name" 
+              name="name" 
+              value={formData.name} 
+              onChange={handleInputChange} 
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="description">Mô tả sản phẩm</Label>
+            <Textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="short_description">Mô tả ngắn</Label>
+            <Textarea
+              id="short_description"
+              name="short_description"
+              value={formData.short_description}
+              onChange={handleInputChange}
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="regular_price">Giá gốc</Label>
+              <Input
+                type="number"
+                id="regular_price"
+                name="regular_price"
+                value={formData.regular_price}
+                onChange={handleInputChange}
               />
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mã sản phẩm (SKU)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ví dụ: GLCC-001" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            </div>
+            
+            <div>
+              <Label htmlFor="sale_price">Giá khuyến mãi</Label>
+              <Input
+                type="number"
+                id="sale_price"
+                name="sale_price"
+                value={formData.sale_price}
+                onChange={handleInputChange}
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Giá bán</FormLabel>
-                      <FormControl>
-                        <Input type="text" placeholder="Ví dụ: 250000" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="manage_stock">Quản lý kho</Label>
+            <Switch
+              id="manage_stock"
+              name="manage_stock"
+              checked={formData.manage_stock}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, manage_stock: checked }))}
+            />
+          </div>
+          
+          {formData.manage_stock && (
+            <div>
+              <Label htmlFor="stock_quantity">Số lượng tồn kho</Label>
+              <Input
+                type="number"
+                id="stock_quantity"
+                name="stock_quantity"
+                value={formData.stock_quantity}
+                onChange={handleInputChange}
+              />
+            </div>
+          )}
+          
+          <div>
+            <Label>Danh mục sản phẩm</Label>
+            <Select 
+              onValueChange={value => {
+                setFormData(prev => ({
+                  ...prev,
+                  categories: [...selectedCategories, { id: parseInt(value), name: categoryOptions.find(cat => cat.id.toString() === value)?.name || '' }]
+                }));
+              }}
+              defaultValue=""
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Chọn danh mục" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map(category => (
+                  <SelectItem key={category.id} value={category.id.toString()}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label>Ảnh sản phẩm</Label>
+            <div className="flex items-center space-x-4">
+              {formData.images.map((image: any) => (
+                <Avatar key={image.id}>
+                  <AvatarImage src={image.source_url || image.src} alt={image.alt_text || "Product Image"} />
+                  <AvatarFallback><ImageIcon /></AvatarFallback>
+                </Avatar>
+              ))}
+              
+              <div className="relative">
+                <Input
+                  type="file"
+                  id="image_upload"
+                  className="absolute w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleImageUpload}
+                  disabled={isUploading}
                 />
-                <FormField
-                  control={form.control}
-                  name="regular_price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Giá gốc</FormLabel>
-                      <FormControl>
-                        <Input type="text" placeholder="Ví dụ: 300000" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <Label
+                  htmlFor="image_upload"
+                  className="flex items-center justify-center w-12 h-12 rounded-full bg-secondary text-muted-foreground hover:bg-secondary/80 cursor-pointer"
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-6 w-6" />
                   )}
-                />
-                <FormField
-                  control={form.control}
-                  name="sale_price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Giá khuyến mãi</FormLabel>
-                      <FormControl>
-                        <Input type="text" placeholder="Ví dụ: 200000" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="stock_quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Số lượng tồn kho</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ví dụ: 100" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                </Label>
               </div>
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mô tả sản phẩm</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Mô tả chi tiết về sản phẩm" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="short_description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mô tả ngắn</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Mô tả ngắn gọn về sản phẩm" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="categories"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Danh mục sản phẩm</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange([value])}
-                      defaultValue={field.value?.[0]}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn danh mục" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex items-center space-x-2">
-                <FormField
-                  control={form.control}
-                  name="manage_stock"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-md border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Quản lý kho</FormLabel>
-                        <FormDescription>Cho phép quản lý số lượng tồn kho.</FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="featured"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-md border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Sản phẩm nổi bật</FormLabel>
-                        <FormDescription>Hiển thị sản phẩm trên trang chủ.</FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <CardFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {productId ? "Cập nhật sản phẩm" : "Thêm sản phẩm"}
-                </Button>
-              </CardFooter>
-            </form>
-          </Form>
-        </CardContent>
+            </div>
+            
+            {isUploading && (
+              <Progress value={uploadProgress} className="mt-2" />
+            )}
+          </div>
+          
+          <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+            {createProduct.isPending || updateProduct.isPending ? (
+              <>
+                Đang xử lý...
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              </>
+            ) : (
+              isEditMode ? "Cập nhật sản phẩm" : "Tạo sản phẩm"
+            )}
+          </Button>
+        </form>
       </Card>
     </div>
   );

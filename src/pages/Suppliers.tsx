@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -63,7 +62,11 @@ export default function Suppliers() {
   });
   
   // Get suppliers data
-  const { data: suppliers = [], isLoading, isError, refetch } = useGetSuppliers();
+  const { data: suppliers = [], isLoading, isError, refetch, error } = useGetSuppliers();
+  
+  console.log("Suppliers data:", suppliers);
+  console.log("API error:", error);
+  
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();
@@ -71,9 +74,9 @@ export default function Suppliers() {
   // Filter suppliers based on search term
   const filteredSuppliers = suppliers.filter(supplier => 
     supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.phone?.includes(searchTerm) ||
-    supplier.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    (supplier.contact_name && supplier.contact_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (supplier.phone && supplier.phone.includes(searchTerm)) ||
+    (supplier.email && supplier.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
   
   // Form for create
@@ -115,7 +118,7 @@ export default function Suppliers() {
       phone: supplier.phone || "",
       email: supplier.email || "",
       address: supplier.address || "",
-      initial_debt: supplier.initial_debt,
+      initial_debt: supplier.initial_debt || 0,
       notes: supplier.notes || "",
       status: supplier.status,
     });
@@ -127,6 +130,7 @@ export default function Suppliers() {
     createSupplier.mutate({
       ...data,
       total_debt: data.initial_debt, // Initially, total debt is the same as initial debt
+      current_debt: data.initial_debt, // Set current debt to initial debt
     }, {
       onSuccess: () => {
         setOpenCreateDialog(false);
@@ -144,7 +148,13 @@ export default function Suppliers() {
       id: selectedSupplier.id,
       data: {
         ...data,
-        // Don't update total_debt here, it should be managed by the system
+        // Keep the current_debt and total_debt values unless initial_debt has changed
+        current_debt: data.initial_debt !== selectedSupplier.initial_debt ? 
+          (selectedSupplier.current_debt || 0) - (selectedSupplier.initial_debt || 0) + data.initial_debt : 
+          selectedSupplier.current_debt,
+        total_debt: data.initial_debt !== selectedSupplier.initial_debt ? 
+          (selectedSupplier.total_debt || 0) - (selectedSupplier.initial_debt || 0) + data.initial_debt : 
+          selectedSupplier.total_debt
       }
     }, {
       onSuccess: () => {
@@ -180,8 +190,9 @@ export default function Suppliers() {
       'Số điện thoại': supplier.phone || '',
       'Email': supplier.email || '',
       'Địa chỉ': supplier.address || '',
-      'Nợ ban đầu': supplier.initial_debt,
-      'Nợ hiện tại': supplier.total_debt,
+      'Nợ ban đầu': supplier.initial_debt || 0,
+      'Nợ hiện tại': supplier.current_debt || 0,
+      'Tổng nợ': supplier.total_debt || 0,
       'Trạng thái': supplier.status === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động',
       'Ghi chú': supplier.notes || ''
     }));
@@ -380,6 +391,7 @@ export default function Suppliers() {
             <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
             <p className="text-muted-foreground mt-1 mb-4">
               Đã xảy ra lỗi khi tải dữ liệu nhà cung cấp từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
+              {error instanceof Error && <span className="block mt-2 text-xs">{error.message}</span>}
             </p>
             <Button variant="outline" onClick={() => refetch()}>
               Thử lại
@@ -412,8 +424,8 @@ export default function Suppliers() {
                       </div>
                     </TableCell>
                     <TableCell>{supplier.address || "—"}</TableCell>
-                    <TableCell>{formatCurrency(supplier.initial_debt.toString())}</TableCell>
-                    <TableCell>{formatCurrency(supplier.total_debt.toString())}</TableCell>
+                    <TableCell>{formatCurrency((supplier.initial_debt || 0).toString())}</TableCell>
+                    <TableCell>{formatCurrency((supplier.current_debt || 0).toString())}</TableCell>
                     <TableCell>{supplier.notes || "—"}</TableCell>
                     <TableCell>
                       <Badge variant={supplier.status === 'active' ? 'default' : 'secondary'}>

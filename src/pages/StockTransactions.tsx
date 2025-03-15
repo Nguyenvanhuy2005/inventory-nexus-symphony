@@ -21,7 +21,6 @@ export default function StockTransactions() {
     per_page: perPage
   });
   
-  // Filter transactions based on search and type filters
   const filteredTransactions = stockTransactionsData?.transactions
     .filter(transaction => {
       if (searchTerm) {
@@ -153,7 +152,7 @@ export default function StockTransactions() {
                     <TableRow key={transaction.id}>
                       <TableCell className="font-medium">{transaction.id}</TableCell>
                       <TableCell>{transaction.product_name || `Sản phẩm #${transaction.product_id}`}</TableCell>
-                      <TableCell>{transaction.transaction_type_display}</TableCell>
+                      <TableCell>{getTransactionTypeDisplay(transaction.type || '')}</TableCell>
                       <TableCell className={`text-right font-medium ${transaction.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {transaction.quantity_formatted}
                       </TableCell>

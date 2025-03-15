@@ -50,7 +50,7 @@ export default function Settings() {
   const [wpUsers, setWpUsers] = useState<any[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   
-  const { data: apiStatus, isLoading: isLoadingStatus, refetch: refetchApiStatus } = useCheckAPIStatus();
+  const { data: apiStatus, isLoading: isApiStatusLoading, refetch: refetchApiStatus } = useCheckAPIStatus();
   
   useEffect(() => {
     loadWpUsers();
@@ -279,7 +279,7 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {isLoadingStatus ? (
+                {isApiStatusLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
                     <span>Đang kiểm tra kết nối...</span>
@@ -287,36 +287,49 @@ export default function Settings() {
                 ) : (
                   <>
                     <div className="flex items-start gap-2">
-                      {apiStatus?.isConnected ? (
+                      {apiStatus && apiStatus.isConnected ? (
                         <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                       ) : (
                         <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
                       )}
                       <div>
                         <p className="font-medium">
-                          WordPress API: {apiStatus?.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
+                          WordPress API: {apiStatus && apiStatus.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {apiStatus?.status?.message || 'Không có thông tin trạng thái'}
+                          {apiStatus && apiStatus.status?.message || 'Không có thông tin trạng thái'}
                         </p>
                       </div>
                     </div>
                     
                     <div className="flex items-start gap-2">
-                      {apiStatus?.woocommerce?.isConnected ? (
+                      {apiStatus && apiStatus.woocommerce?.isConnected ? (
                         <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                       ) : (
                         <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
                       )}
                       <div>
                         <p className="font-medium">
-                          WooCommerce API: {apiStatus?.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết n���i'}
+                          WooCommerce API: {apiStatus && apiStatus.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết n���i'}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {apiStatus?.woocommerce?.error || 'Không có thông tin lỗi'}
+                          {apiStatus && apiStatus.woocommerce?.error || 'Không có thông tin lỗi'}
                         </p>
                       </div>
                     </div>
+                    
+                    {apiStatus && !apiStatus.isConnected && (
+                      <div className="text-sm mt-2 text-red-500 flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        <span>
+                          {typeof apiStatus.error === 'string' 
+                            ? apiStatus.error 
+                            : apiStatus.error && typeof apiStatus.error === 'object' && 'message' in apiStatus.error 
+                              ? (apiStatus.error as any).message
+                              : 'Không thể kết nối đến API'}
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
                 
@@ -324,7 +337,7 @@ export default function Settings() {
                   variant="outline" 
                   className="w-full mt-2"
                   onClick={() => refetchApiStatus()}
-                  disabled={isLoadingStatus}
+                  disabled={isApiStatusLoading}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Kiểm tra lại kết nối

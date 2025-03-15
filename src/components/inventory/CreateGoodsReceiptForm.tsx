@@ -1,4 +1,3 @@
-
 // Import necessary libraries and components
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -54,6 +53,7 @@ import { Product, Supplier, GoodsReceipt, GoodsReceiptItem } from "@/types/model
 import { useQuery } from "@tanstack/react-query";
 import { fetchCustomAPI } from "@/lib/api-utils";
 import { getAllProducts } from "@/lib/woocommerce";
+import { useGetProducts } from "@/hooks/api-hooks";
 
 // Define the form schema
 const formSchema = z.object({
@@ -80,6 +80,7 @@ export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceipt
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
   const navigate = useNavigate();
 
   // Fetch suppliers data

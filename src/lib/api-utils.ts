@@ -55,7 +55,8 @@ export async function checkAPIStatus() {
   try {
     const response = await fetch(`${API_BASE_URL}/custom/v1/status?_=${Date.now()}`);
     if (!response.ok) {
-      throw new Error(`API status check failed: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`API status check failed: ${response.status} - ${errorText}`);
     }
     const data = await response.json();
     console.info('Custom API response data:', data);
@@ -72,7 +73,7 @@ export async function checkAPIStatus() {
         timestamp: new Date().toISOString() 
       },
       isConnected: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error
     };
   }
 }
