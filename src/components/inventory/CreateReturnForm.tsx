@@ -19,7 +19,6 @@ import { Trash2, Plus, Package, User, Truck, Search } from "lucide-react";
 import { format } from "date-fns";
 import { generateId } from "@/lib/utils";
 
-// Add a conversion function to help with type compatibility between WooCommerce Product and our model Product
 const convertWooCommerceProduct = (product: any): ModelProduct => {
   return {
     id: product.id,
@@ -167,7 +166,6 @@ export default function CreateReturnForm({ onSuccess, initialData }: CreateRetur
     );
     
     if (existingItemIndex >= 0) {
-      // Update existing item
       const updatedItems = [...returnData.items];
       updatedItems[existingItemIndex].quantity += 1;
       updatedItems[existingItemIndex].total_price = 
@@ -179,7 +177,6 @@ export default function CreateReturnForm({ onSuccess, initialData }: CreateRetur
         total_amount: calculateTotal(updatedItems)
       }));
     } else {
-      // Add new item
       const price = parseFloat(product.price || product.regular_price || "0");
       const newItem: ReturnItem = {
         product_id: product.id,

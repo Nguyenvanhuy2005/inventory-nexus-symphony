@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -52,7 +51,6 @@ export default function Settings() {
         description: "Đã lưu thông tin xác thực API thành công.",
       });
       
-      // Reload the page to apply the new settings
       navigate(0);
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -78,7 +76,6 @@ export default function Settings() {
         description: "Đã khôi phục cài đặt mặc định thành công.",
       });
       
-      // Reload the page to apply the reset settings
       navigate(0);
     }
   };
@@ -103,20 +100,20 @@ export default function Settings() {
     toast({ description: "Đã sao chép Mật khẩu ứng dụng vào clipboard." });
   };
 
-  // Safely access nested properties with optional chaining
-  const isConnected = apiStatus?.data?.status && typeof apiStatus.data.status === 'object' && 
+  const isConnected = apiStatus?.data?.status && 
+                      typeof apiStatus.data.status === 'object' && 
                       'wordpress' in apiStatus.data.status && 
                       typeof apiStatus.data.status.wordpress === 'object' && 
                       'connected' in apiStatus.data.status.wordpress ? 
                       apiStatus.data.status.wordpress.connected : false;
                       
-  const wordpressStatus = apiStatus?.data?.status && typeof apiStatus.data.status === 'object' && 
+  const wordpressStatus = apiStatus?.data?.status && 
+                         typeof apiStatus.data.status === 'object' && 
                          'wordpress' in apiStatus.data.status && 
                          typeof apiStatus.data.status.wordpress === 'object' && 
                          'message' in apiStatus.data.status.wordpress ? 
                          apiStatus.data.status.wordpress.message : "Unknown status";
 
-  // Check WooCommerce authentication status safely
   const isWooCommerceAuthenticated = apiStatus?.data?.woocommerce && 
                                     typeof apiStatus.data.woocommerce === 'object' && 
                                     'isAuthenticated' in apiStatus.data.woocommerce ? 
