@@ -9,7 +9,10 @@ import {
   Return,
   DamagedStock,
   StockAdjustment,
-  CustomerDebt
+  CustomerDebt,
+  StockLevel,
+  PurchaseOrder,
+  StockEntry
 } from "@/types/models";
 
 // --- API Status ---
@@ -190,6 +193,7 @@ export function useCreateGoodsReceipt() {
       queryClient.invalidateQueries({ queryKey: ['goodsReceipts'] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
       toast.success('Phiếu nhập hàng đã được tạo thành công');
     },
     onError: (error) => {
@@ -232,6 +236,7 @@ export function useCreateReturn() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['returns'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
       if (variables.type === 'customer') {
         queryClient.invalidateQueries({ queryKey: ['customers'] });
       } else {
@@ -269,6 +274,7 @@ export function useCreateDamagedStock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['damagedStock'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
       toast.success('Báo cáo hàng hỏng đã được tạo thành công');
     },
     onError: (error) => {
@@ -301,11 +307,55 @@ export function useCreateStockAdjustment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stockAdjustments'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
       toast.success('Điều chỉnh tồn kho đã được tạo thành công');
     },
     onError: (error) => {
       console.error('Error creating stock adjustment:', error);
       toast.error('Không thể tạo điều chỉnh tồn kho: ' + (error instanceof Error ? error.message : ''));
+    }
+  });
+}
+
+// --- Stock Levels ---
+export function useGetStockLevels() {
+  return useQuery({
+    queryKey: ['stockLevels'],
+    queryFn: async () => {
+      return await fetchCustomAPI('/stock-levels') as StockLevel[];
+    }
+  });
+}
+
+export function useGetStockLevel(productId: number) {
+  return useQuery({
+    queryKey: ['stockLevel', productId.toString()],
+    queryFn: async () => {
+      return await fetchCustomAPI(`/stock-levels/${productId}`) as StockLevel;
+    },
+    enabled: !!productId
+  });
+}
+
+export function useUpdateStockLevel() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (stockLevel: StockLevel) => {
+      return await fetchCustomAPI(`/stock-levels/${stockLevel.product_id}`, {
+        method: 'PUT',
+        body: stockLevel
+      }) as StockLevel;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['stockLevels'] });
+      queryClient.invalidateQueries({ queryKey: ['stockLevel', variables.product_id.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Tồn kho đã được cập nhật thành công');
+    },
+    onError: (error) => {
+      console.error('Error updating stock level:', error);
+      toast.error('Không thể cập nhật tồn kho: ' + (error instanceof Error ? error.message : ''));
     }
   });
 }

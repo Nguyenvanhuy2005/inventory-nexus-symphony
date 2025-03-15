@@ -1,6 +1,7 @@
 
 import { useState } from "react";
-import { useGetProducts, useGetProductVariations } from "@/hooks/use-mock-data";
+import { useGetProducts } from "@/hooks/use-mock-data";
+import { useGetStockLevels } from "@/hooks/api-hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,12 +23,23 @@ const formatCurrency = (value: string | undefined) => {
 };
 
 export default function Inventory() {
-  const { data: products, isLoading } = useGetProducts();
+  const { data: products, isLoading: isLoadingProducts } = useGetProducts();
+  const { data: stockLevels, isLoading: isLoadingStockLevels } = useGetStockLevels();
   const [tab, setTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   
+  // Combine products with stock levels
+  const productsWithStock = products?.map(product => {
+    const stockLevel = stockLevels?.find(sl => sl.product_id === product.id);
+    return {
+      ...product,
+      real_stock: stockLevel?.ton_thuc_te || product.stock_quantity,
+      available_to_sell: stockLevel?.co_the_ban || product.stock_quantity
+    };
+  });
+  
   // Filter products based on tab and search term
-  const filteredProducts = products?.filter(product => {
+  const filteredProducts = productsWithStock?.filter(product => {
     const matchesSearch = 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -37,14 +49,16 @@ export default function Inventory() {
     if (tab === "outofstock") return product.stock_status === "outofstock" && matchesSearch;
     if (tab === "lowstock") {
       return product.stock_status === "instock" && 
-        (product.stock_quantity <= 5 || product.available_to_sell <= 5) && 
+        (product.real_stock <= 5 || product.available_to_sell <= 5) && 
         matchesSearch;
     }
     return matchesSearch;
   });
   
+  const isLoading = isLoadingProducts || isLoadingStockLevels;
+  
   // Generate stock status badge
-  const getStockStatusBadge = (product: Product) => {
+  const getStockStatusBadge = (product: Product & { real_stock?: number, available_to_sell?: number }) => {
     if (product.stock_status === "outofstock") {
       return <Badge variant="outline" className="border-red-500 text-red-500">Hết hàng</Badge>;
     }
@@ -128,9 +142,9 @@ export default function Inventory() {
 }
 
 interface ProductsTableProps {
-  products: Product[] | undefined;
+  products: (Product & { real_stock?: number, available_to_sell?: number })[] | undefined;
   isLoading: boolean;
-  getStockStatusBadge: (product: Product) => JSX.Element;
+  getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number }) => JSX.Element;
 }
 
 function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTableProps) {
@@ -184,7 +198,7 @@ function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTab
               <TableCell className="font-medium">{product.sku || "-"}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  {product.images[0] && (
+                  {product.images?.[0] && (
                     <img 
                       src={product.images[0].src} 
                       alt={product.name} 
@@ -194,9 +208,9 @@ function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTab
                   <span>{product.name}</span>
                 </div>
               </TableCell>
-              <TableCell>{product.real_stock || product.stock_quantity}</TableCell>
+              <TableCell>{product.real_stock || product.stock_quantity || 0}</TableCell>
               <TableCell>{product.pending_orders || 0}</TableCell>
-              <TableCell>{product.available_to_sell || product.stock_quantity}</TableCell>
+              <TableCell>{product.available_to_sell || product.stock_quantity || 0}</TableCell>
               <TableCell>{formatCurrency(product.price)}</TableCell>
               <TableCell>{getStockStatusBadge(product)}</TableCell>
               <TableCell className="text-right">

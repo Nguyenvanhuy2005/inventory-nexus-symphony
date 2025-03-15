@@ -147,3 +147,28 @@ export interface Product {
   type?: string;
   manage_stock?: boolean;
 }
+
+// New interfaces for stock management
+export interface StockLevel {
+  product_id: number;
+  ton_thuc_te: number;
+  co_the_ban: number;
+  last_updated: string;
+}
+
+export interface PurchaseOrder {
+  id: number;
+  supplier_id: number;
+  order_date: string;
+  status: string;
+  created_at: string;
+}
+
+export interface StockEntry {
+  id: number;
+  purchase_order_id: number;
+  product_id: number;
+  quantity: number;
+  cost_price: number;
+  created_at: string;
+}

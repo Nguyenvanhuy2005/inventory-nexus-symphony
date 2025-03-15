@@ -133,6 +133,25 @@ function hmm_register_custom_api_endpoints() {
         'callback' => 'hmm_get_attachments',
         'permission_callback' => '__return_true',
     ));
+    
+    // Register stock levels endpoints
+    register_rest_route('custom/v1', '/stock-levels', array(
+        'methods' => 'GET',
+        'callback' => 'hmm_get_stock_levels',
+        'permission_callback' => 'hmm_api_permissions_check',
+    ));
+    
+    register_rest_route('custom/v1', '/stock-levels/(?P<product_id>\d+)', array(
+        'methods' => 'GET',
+        'callback' => 'hmm_get_stock_level',
+        'permission_callback' => 'hmm_api_permissions_check',
+    ));
+    
+    register_rest_route('custom/v1', '/stock-levels/(?P<product_id>\d+)', array(
+        'methods' => 'PUT',
+        'callback' => 'hmm_update_stock_level',
+        'permission_callback' => 'hmm_api_permissions_check',
+    ));
 }
 
 // Kiểm tra quyền truy cập API
@@ -857,6 +876,186 @@ function hmm_create_payment_receipts_table() {
     dbDelta($sql);
 }
 
+// --- Stock Levels Functions ---
+function hmm_get_stock_levels() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_stock_levels_table();
+        // Khởi tạo dữ liệu tồn kho cho các sản phẩm hiện có
+        hmm_initialize_stock_levels();
+    }
+    
+    $stock_levels = $wpdb->get_results("SELECT * FROM $table_name", ARRAY_A);
+    return $stock_levels;
+}
+
+function hmm_get_stock_level($request) {
+    global $wpdb;
+    $product_id = $request['product_id'];
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_stock_levels_table();
+    }
+    
+    $stock_level = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM $table_name WHERE product_id = %d", $product_id),
+        ARRAY_A
+    );
+    
+    if (!$stock_level) {
+        // Nếu không tìm thấy, tạo bản ghi mới với dữ liệu mặc định
+        $wpdb->insert(
+            $table_name,
+            array(
+                'product_id' => $product_id,
+                'ton_thuc_te' => 0,
+                'co_the_ban' => 0,
+                'last_updated' => current_time('mysql')
+            )
+        );
+        
+        $stock_level = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM $table_name WHERE product_id = %d", $product_id),
+            ARRAY_A
+        );
+    }
+    
+    return $stock_level;
+}
+
+function hmm_update_stock_level($request) {
+    global $wpdb;
+    $product_id = $request['product_id'];
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra bảng đã tồn tại chưa, nếu chưa thì tạo mới
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        hmm_create_stock_levels_table();
+    }
+    
+    $params = $request->get_params();
+    
+    // Kiểm tra xem sản phẩm đã có trong bảng tồn kho chưa
+    $existing = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM $table_name WHERE product_id = %d", $product_id),
+        ARRAY_A
+    );
+    
+    if ($existing) {
+        // Cập nhật bản ghi hiện có
+        $wpdb->update(
+            $table_name,
+            array(
+                'ton_thuc_te' => $params['ton_thuc_te'],
+                'co_the_ban' => $params['co_the_ban'],
+                'last_updated' => current_time('mysql')
+            ),
+            array('product_id' => $product_id)
+        );
+    } else {
+        // Tạo bản ghi mới
+        $wpdb->insert(
+            $table_name,
+            array(
+                'product_id' => $product_id,
+                'ton_thuc_te' => $params['ton_thuc_te'],
+                'co_the_ban' => $params['co_the_ban'],
+                'last_updated' => current_time('mysql')
+            )
+        );
+    }
+    
+    if ($wpdb->last_error) {
+        return new WP_Error('db_error', $wpdb->last_error, array('status' => 500));
+    }
+    
+    // Đồng bộ với bảng tồn kho WooCommerce nếu có
+    hmm_sync_stock_with_woocommerce($product_id, $params['co_the_ban']);
+    
+    // Lấy dữ liệu đã cập nhật
+    $updated_stock = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM $table_name WHERE product_id = %d", $product_id),
+        ARRAY_A
+    );
+    
+    return $updated_stock;
+}
+
+function hmm_sync_stock_with_woocommerce($product_id, $new_stock) {
+    // Cập nhật tồn kho trong WooCommerce nếu cần
+    if (function_exists('wc_update_product_stock')) {
+        wc_update_product_stock($product_id, $new_stock);
+    } else {
+        // Fallback nếu WooCommerce không được kích hoạt hoặc hàm không tồn tại
+        update_post_meta($product_id, '_stock', $new_stock);
+        $stock_status = $new_stock > 0 ? 'instock' : 'outofstock';
+        update_post_meta($product_id, '_stock_status', $stock_status);
+    }
+}
+
+function hmm_create_stock_levels_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Kiểm tra xem bảng đã tồn tại chưa
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        $sql = "CREATE TABLE $table_name (
+            product_id bigint(20) NOT NULL,
+            ton_thuc_te int(11) NOT NULL DEFAULT 0,
+            co_the_ban int(11) NOT NULL DEFAULT 0,
+            last_updated datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (product_id)
+        ) $charset_collate;";
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+}
+
+function hmm_initialize_stock_levels() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_stock_levels';
+    
+    // Lấy tất cả sản phẩm từ WooCommerce
+    $args = array(
+        'post_type' => 'product',
+        'posts_per_page' => -1,
+        'post_status' => 'publish',
+    );
+    $products = get_posts($args);
+    
+    foreach ($products as $product) {
+        $product_id = $product->ID;
+        $stock = get_post_meta($product_id, '_stock', true);
+        $stock = $stock ? (int)$stock : 0;
+        
+        // Kiểm tra xem sản phẩm đã có trong bảng tồn kho chưa
+        $existing = $wpdb->get_var(
+            $wpdb->prepare("SELECT product_id FROM $table_name WHERE product_id = %d", $product_id)
+        );
+        
+        if (!$existing) {
+            // Thêm sản phẩm vào bảng tồn kho
+            $wpdb->insert(
+                $table_name,
+                array(
+                    'product_id' => $product_id,
+                    'ton_thuc_te' => $stock,
+                    'co_the_ban' => $stock,
+                    'last_updated' => current_time('mysql')
+                )
+            );
+        }
+    }
+}
+
 // Thêm route kiểm tra trạng thái API
 register_rest_route('custom/v1', '/status', array(
     'methods' => 'GET',
@@ -910,6 +1109,7 @@ function hmm_activate_plugin() {
     hmm_create_suppliers_table();
     hmm_create_payment_receipts_table();
     hmm_create_attachments_table();
+    hmm_create_stock_levels_table();
     
     // Thêm dữ liệu mẫu nếu chưa có
     hmm_add_sample_data();
@@ -940,6 +1140,9 @@ function hmm_add_sample_data() {
             )
         );
     }
+    
+    // Khởi tạo dữ liệu tồn kho nếu chưa có
+    hmm_initialize_stock_levels();
 }
 
 // Deactivation hook
