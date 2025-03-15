@@ -5,16 +5,16 @@ import { fetchWooCommerce } from './api-utils';
  * Default WooCommerce credentials - These will be used if not overridden by localStorage
  */
 export const DEFAULT_WOOCOMMERCE_CREDENTIALS = {
-  consumer_key: 'ck_89c459799faea76b1eea95a3838b27172501f5a8',
-  consumer_secret: 'cs_a9b30a11388a05da94b20c0c20539eace3b98645'
+  consumer_key: 'ck_34d8c29605850d8d25a1600ed77159b2bfe3ba31',
+  consumer_secret: 'cs_f3710ff84d27f0d4705ede1ad1c066e67a6e8640'
 };
 
 /**
  * Default WordPress credentials
  */
 export const DEFAULT_WORDPRESS_CREDENTIALS = {
-  username: 'lovable',
-  application_password: 'wWpY NMDT jFqw eGyy dkZk KPZd'
+  username: 'admin',
+  application_password: 'N4mq 5Vuz 8iD4 3Pkx KxXn 3KQu'
 };
 
 /**
