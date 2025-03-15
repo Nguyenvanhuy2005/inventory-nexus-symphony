@@ -32,8 +32,8 @@ interface ProductOption {
 }
 
 interface ProductSelectAutoCompleteProps {
-  onSelect: (product: any) => void;
-  selectedProduct: any | null;
+  onSelect: (product: ModelProduct | ProductOption) => void;
+  selectedProduct: ModelProduct | ProductOption | null;
   placeholder?: string;
   disabled?: boolean;
   showProductInfo?: boolean;

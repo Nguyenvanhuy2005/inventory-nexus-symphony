@@ -14,7 +14,7 @@ type ApiStatus = {
   error?: string | null;
   status?: string;
   woocommerce: {
-    isConnected: boolean;
+    isAuthenticated: boolean;
     error: string | null;
   }
 };
@@ -29,7 +29,7 @@ type ProductWithVariations = {
  * @returns API status information
  */
 export function useCheckAPIStatus() {
-  return useQuery<ApiStatus, Error>({
+  return useQuery<any, Error>({
     queryKey: ['api-status'],
     queryFn: async () => {
       // Ensure credentials are initialized
@@ -41,10 +41,16 @@ export function useCheckAPIStatus() {
       return {
         ...apiStatus,
         woocommerce: {
-          isConnected: woocommerceStatus,
+          isAuthenticated: woocommerceStatus,
           error: woocommerceStatus ? null : 'Không thể xác thực với WooCommerce API'
+        },
+        status: apiStatus.status || {
+          wordpress: {
+            connected: false,
+            message: "Not checked"
+          }
         }
-      } as ApiStatus;
+      };
     },
     refetchOnWindowFocus: false,
     refetchInterval: false,
