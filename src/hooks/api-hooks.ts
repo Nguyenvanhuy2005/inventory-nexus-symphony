@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { checkAPIStatus } from "@/lib/api-utils";
 import { checkWooCommerceAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
@@ -11,6 +10,7 @@ type ApiStatus = {
   isConnected: boolean;
   version?: string;
   error?: string | null;
+  status?: string;
   woocommerce: {
     isConnected: boolean;
     error: string | null;
@@ -27,7 +27,7 @@ type ProductWithVariations = {
  * @returns API status information
  */
 export function useCheckAPIStatus() {
-  return useQuery({
+  return useQuery<ApiStatus, Error>({
     queryKey: ['api-status'],
     queryFn: async () => {
       // Ensure credentials are initialized
@@ -83,7 +83,7 @@ export function useSyncProductsStock() {
  * Hook to fetch all products from WooCommerce
  */
 export function useGetProducts(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<Product[], Error>({
     queryKey: ['products', params],
     queryFn: async () => {
       try {
@@ -125,7 +125,8 @@ export function useGetProductWithVariations(productId: number | string | null) {
         return { product: null, variations: [] };
       }
     },
-    enabled
+    enabled,
+    select: (data) => data // This makes the data directly accessible with destructuring
   });
 }
 
@@ -156,10 +157,10 @@ export function useUpdateProduct() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await fetchWooCommerce(`/products/${id}`, {
+    mutationFn: async (params: { id: number, data: any }) => {
+      return await fetchWooCommerce(`/products/${params.id}`, {
         method: 'PUT',
-        body: data
+        body: params.data
       });
     },
     onSuccess: (_, variables) => {
@@ -238,7 +239,7 @@ export function useGetPaymentReceipt(receiptId?: number) {
 /**
  * Hook to get stock transactions with pagination
  */
-export function useGetStockTransactions(params?: Record<string, string>) {
+export function useGetStockTransactions(params: Record<string, string> = {}) {
   return useQuery<{ transactions: StockTransaction[], total_pages: number }, Error>({
     queryKey: ['stock-transactions', params],
     queryFn: async () => {
@@ -293,15 +294,6 @@ export function useDeleteSupplier() {
   return useMutation({
     mutationFn: async (id: any) => {
       return { success: true };
-    }
-  });
-}
-
-export function useGetStockTransactions() {
-  return useQuery({
-    queryKey: ['stock-transactions'],
-    queryFn: async () => {
-      return { transactions: [], total_pages: 0 };
     }
   });
 }

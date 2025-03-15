@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { 
   useGetProductWithVariations, 
@@ -52,7 +51,7 @@ const formatCurrency = (value: string | undefined) => {
 export default function ProductDetail() {
   const { id } = useParams();
   const productId = parseInt(id || "0");
-  const { product, variations, isLoading, error } = useGetProductWithVariations(productId);
+  const { data, isLoading, error } = useGetProductWithVariations(productId);
   const updateStockLevel = useUpdateStockLevel();
   const createStockLevel = useCreateStockLevel();
   
@@ -60,15 +59,21 @@ export default function ProductDetail() {
   const [realStock, setRealStock] = useState<number>(0);
   const [availableStock, setAvailableStock] = useState<number>(0);
 
+  // Extract product and variations from the data
+  const product = data?.product;
+  const variations = data?.variations || [];
+
   // Initialize stock values when product data is loaded
-  useState(() => {
+  useEffect(() => {
     if (product) {
       setRealStock(product.real_stock || product.stock_quantity || 0);
       setAvailableStock(product.available_to_sell || product.stock_quantity || 0);
     }
-  });
+  }, [product]);
 
   const handleSaveStockUpdate = async () => {
+    if (!product) return;
+    
     const stockData = {
       product_id: productId,
       ton_thuc_te: realStock,

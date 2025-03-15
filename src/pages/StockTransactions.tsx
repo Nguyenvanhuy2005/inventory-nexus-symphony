@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useGetStockTransactions } from "@/hooks/api-hooks";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -12,8 +11,8 @@ import { getTransactionTypeDisplay, formatTransactionForDisplay, exportToCSV } f
 import { Loader2, Search, Download, RefreshCw } from "lucide-react";
 
 export default function StockTransactions() {
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [page, setPage] = useState<string>("1");
+  const [perPage, setPerPage] = useState<string>("20");
   const [searchTerm, setSearchTerm] = useState("");
   const [transactionType, setTransactionType] = useState("");
   
@@ -111,7 +110,7 @@ export default function StockTransactions() {
             </div>
             
             <div className="w-full md:w-32">
-              <Select value={perPage.toString()} onValueChange={(value) => setPerPage(parseInt(value))}>
+              <Select value={perPage} onValueChange={(value) => setPerPage(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Số mục" />
                 </SelectTrigger>
@@ -188,16 +187,16 @@ export default function StockTransactions() {
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious 
-                      onClick={() => setPage(prev => Math.max(prev - 1, 1))} 
-                      className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      onClick={() => setPage(String(Math.max(parseInt(page) - 1, 1)))} 
+                      className={parseInt(page) <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
                   </PaginationItem>
                   
                   {[...Array(stockTransactionsData.total_pages)].map((_, i) => (
                     <PaginationItem key={i}>
                       <PaginationLink
-                        isActive={page === i + 1}
-                        onClick={() => setPage(i + 1)}
+                        isActive={parseInt(page) === i + 1}
+                        onClick={() => setPage(String(i + 1))}
                       >
                         {i + 1}
                       </PaginationLink>
@@ -206,8 +205,8 @@ export default function StockTransactions() {
                   
                   <PaginationItem>
                     <PaginationNext 
-                      onClick={() => setPage(prev => Math.min(prev + 1, stockTransactionsData.total_pages))}
-                      className={page >= stockTransactionsData.total_pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      onClick={() => setPage(String(Math.min(parseInt(page) + 1, stockTransactionsData.total_pages)))}
+                      className={parseInt(page) >= stockTransactionsData.total_pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
                   </PaginationItem>
                 </PaginationContent>
