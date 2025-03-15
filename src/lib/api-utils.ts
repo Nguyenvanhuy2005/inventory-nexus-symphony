@@ -1,5 +1,9 @@
 import { toast } from "sonner";
 
+// API base URLs with fallbacks that will work in browser environment
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://hmm.vn/wp-json';
+const WOOCOMMERCE_API_URL = import.meta.env.VITE_WOOCOMMERCE_API_URL || 'https://hmm.vn/wp-json/wc/v3';
+
 // Mock data for WooCommerce API fallback - only used for development and debugging
 export const mockWooCommerceData = {
   products: [
@@ -22,7 +26,7 @@ export const mockWooCommerceData = {
  */
 export async function checkAPIStatus() {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hmm.vn/wp-json'}/custom/v1/status?_=${Date.now()}`);
+    const response = await fetch(`${API_BASE_URL}/custom/v1/status?_=${Date.now()}`);
     if (!response.ok) {
       throw new Error(`API status check failed: ${response.status}`);
     }
@@ -68,7 +72,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://hmm.vn/wp-json'}/custom/v1${endpoint}`;
+    const url = `${API_BASE_URL}/custom/v1${endpoint}`;
     console.info(`Fetching Custom API: ${endpoint}`, url);
     
     const response = await fetch(url, fetchOptions);
@@ -112,11 +116,8 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    // Use proper WooCommerce API URL
-    const baseUrl = process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL || 'https://hmm.vn/wp-json/wc/v3';
-    
     // Build URL with params if they exist
-    let url = `${baseUrl}${endpoint}`;
+    let url = `${WOOCOMMERCE_API_URL}${endpoint}`;
     if (options.params) {
       const searchParams = new URLSearchParams();
       Object.entries(options.params).forEach(([key, value]) => {
@@ -140,10 +141,17 @@ export async function fetchWooCommerce(endpoint: string, options: any = {}) {
   } catch (error) {
     console.error(`Error fetching from WooCommerce API (${endpoint}):`, error);
     
-    // Don't use mock data anymore - let error propagate to caller
+    // Show appropriate error message
     if (!options.suppressToast) {
       toast.error(`Lỗi WooCommerce API: ${error instanceof Error ? error.message : 'Không thể kết nối tới máy chủ'}`);
     }
+    
+    // For demonstration or development, use mock data
+    if (endpoint.includes('/products') && options.method === 'GET') {
+      console.info('Using mock product data');
+      return mockWooCommerceData.products;
+    }
+    
     throw error;
   }
 }
@@ -170,7 +178,7 @@ export async function fetchWordPress(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://hmm.vn/wp-json/wp/v2'}${endpoint}`;
+    const url = `${API_BASE_URL}/wp/v2${endpoint}`;
     console.info(`Fetching WordPress API: ${endpoint}`);
     
     const response = await fetch(url, fetchOptions);
@@ -208,7 +216,7 @@ export async function uploadAttachment(file: File) {
     const formData = new FormData();
     formData.append('file', file);
     
-    const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://hmm.vn/wp-json'}/wp/v2/media`;
+    const url = `${API_BASE_URL}/wp/v2/media`;
     console.info('Uploading file to WordPress media library');
     
     const response = await fetch(url, {

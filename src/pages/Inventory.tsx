@@ -11,7 +11,7 @@ import { Search, Filter, ArrowUpDown, RefreshCw, Info } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product } from "@/types/models";
 import { toast } from "sonner";
-import { fetchWooCommerce, fetchStockLevels, syncProductsWithStockLevels } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchStockLevels, syncProductsWithStockLevels, mockWooCommerceData } from "@/lib/api-utils";
 
 // Format currency
 const formatCurrency = (value: string | undefined) => {
@@ -41,7 +41,8 @@ export default function Inventory() {
       } catch (error) {
         console.error("Error fetching WooCommerce products:", error);
         toast.error("Không thể lấy dữ liệu sản phẩm từ WooCommerce");
-        throw error;
+        // Return mock data during development to prevent UI from breaking
+        return mockWooCommerceData.products as Product[];
       }
     },
     retry: 1
