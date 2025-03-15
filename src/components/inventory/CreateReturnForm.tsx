@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useGetProducts } from '@/hooks/api-hooks';
 import { Product as ModelProduct } from '@/types/models';
@@ -279,6 +280,7 @@ export default function CreateReturnForm({ onSuccess, initialData }: CreateRetur
     }
     
     try {
+      // Remove the argument from createReturn.mutateAsync call
       await createReturn.mutateAsync(returnData);
       toast({
         title: "Thành công",

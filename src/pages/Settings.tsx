@@ -100,24 +100,29 @@ export default function Settings() {
     toast({ description: "Đã sao chép Mật khẩu ứng dụng vào clipboard." });
   };
 
-  const isConnected = apiStatus?.data?.status && 
-                      typeof apiStatus.data.status === 'object' && 
-                      'wordpress' in apiStatus.data.status && 
-                      typeof apiStatus.data.status.wordpress === 'object' && 
-                      'connected' in apiStatus.data.status.wordpress ? 
-                      apiStatus.data.status.wordpress.connected : false;
+  const isConnected = apiStatus?.data?.status ? 
+                    (typeof apiStatus.data.status === 'object' && 
+                    apiStatus.data.status !== null &&
+                    'wordpress' in apiStatus.data.status && 
+                    typeof apiStatus.data.status.wordpress === 'object' && 
+                    apiStatus.data.status.wordpress !== null &&
+                    'connected' in apiStatus.data.status.wordpress ? 
+                    apiStatus.data.status.wordpress.connected : false) : false;
                       
-  const wordpressStatus = apiStatus?.data?.status && 
-                         typeof apiStatus.data.status === 'object' && 
-                         'wordpress' in apiStatus.data.status && 
-                         typeof apiStatus.data.status.wordpress === 'object' && 
-                         'message' in apiStatus.data.status.wordpress ? 
-                         apiStatus.data.status.wordpress.message : "Unknown status";
+  const wordpressStatus = apiStatus?.data?.status ? 
+                        (typeof apiStatus.data.status === 'object' && 
+                        apiStatus.data.status !== null &&
+                        'wordpress' in apiStatus.data.status && 
+                        typeof apiStatus.data.status.wordpress === 'object' && 
+                        apiStatus.data.status.wordpress !== null &&
+                        'message' in apiStatus.data.status.wordpress ? 
+                        apiStatus.data.status.wordpress.message : "Unknown status") : "Unknown status";
 
-  const isWooCommerceAuthenticated = apiStatus?.data?.woocommerce && 
-                                    typeof apiStatus.data.woocommerce === 'object' && 
-                                    'isAuthenticated' in apiStatus.data.woocommerce ? 
-                                    apiStatus.data.woocommerce.isAuthenticated : false;
+  const isWooCommerceAuthenticated = apiStatus?.data?.woocommerce ? 
+                                  (typeof apiStatus.data.woocommerce === 'object' && 
+                                  apiStatus.data.woocommerce !== null &&
+                                  'isAuthenticated' in apiStatus.data.woocommerce ? 
+                                  apiStatus.data.woocommerce.isAuthenticated : false) : false;
   
   return (
     <div className="space-y-6">
@@ -298,3 +303,4 @@ export default function Settings() {
     </div>
   );
 }
+
