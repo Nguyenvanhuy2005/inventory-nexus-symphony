@@ -121,7 +121,10 @@ export default function AddEditProduct() {
       });
       
       if (product.images && product.images.length > 0) {
-        setProductImages(product.images);
+        setProductImages(product.images.map(img => ({
+          id: img.id,
+          src: img.src
+        })));
       }
       
       if (product.attributes && product.attributes.length > 0) {
@@ -134,7 +137,7 @@ export default function AddEditProduct() {
     // Prepare product data for API
     const productData: Partial<Product> = {
       ...values,
-      images: productImages.length > 0 ? productImages : undefined,
+      images: productImages,
       attributes: attributes.length > 0 ? attributes : undefined,
     };
     

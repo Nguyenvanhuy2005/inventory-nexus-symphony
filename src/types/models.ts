@@ -1,4 +1,3 @@
-
 export interface Supplier {
   id: number;
   name: string;
@@ -150,6 +149,7 @@ export interface Product {
   real_stock?: number;
   pending_orders?: number;
   available_to_sell?: number;
+  featured?: boolean;
 }
 
 // Stock interfaces for stock management

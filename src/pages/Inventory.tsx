@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { useGetProducts } from "@/hooks/use-mock-data";
 import { useGetStockLevels } from "@/hooks/api-hooks";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, ArrowUpDown, Eye, RefreshCw } from "lucide-react";
+import { Search, Filter, ArrowUpDown, Eye, ExternalLink, RefreshCw } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product } from "@/lib/woocommerce";
 import { toast } from "sonner";
@@ -25,7 +24,6 @@ const formatCurrency = (value: string | undefined) => {
 };
 
 export default function Inventory() {
-  const navigate = useNavigate();
   const { data: products, isLoading: isLoadingProducts } = useGetProducts();
   const { data: stockLevels, isLoading: isLoadingStockLevels } = useGetStockLevels();
   const [tab, setTab] = useState("all");
@@ -66,11 +64,6 @@ export default function Inventory() {
   });
   
   const isLoading = isLoadingProducts || isLoadingStockLevels;
-  
-  // Navigate to add new product
-  const handleAddNewProduct = () => {
-    navigate("/inventory/add");
-  };
 
   // Show detailed explanation of data
   const showDataSourceInfo = () => {
@@ -79,7 +72,7 @@ export default function Inventory() {
         <p className="font-medium">Nguồn dữ liệu tồn kho:</p>
         <ul className="list-disc pl-5 text-sm">
           <li><strong>Tồn kho thực tế:</strong> Lấy từ bảng <code>hmm_stock_levels</code> trong trường <code>ton_thuc_te</code>. Nếu không có, sẽ dùng <code>stock_quantity</code> từ WooCommerce.</li>
-          <li><strong>Đơn đang xử lý:</strong> Số lượng sản phẩm đang trong đơn hàng chưa hoàn thành. Lấy từ trường <code>meta_data</code> với key <code>pending_orders</code>.</li>
+          <li><strong>Đơn đang xử lý:</strong> Số lượng sản phẩm trong đơn hàng có trạng thái "đang xử lý", "tạm giữ", "chờ thanh toán". Lấy từ trường <code>meta_data</code> với key <code>pending_orders</code>.</li>
           <li><strong>Có thể bán:</strong> Lấy từ bảng <code>hmm_stock_levels</code> trong trường <code>co_the_ban</code>. Nếu không có, sẽ tính bằng công thức: <code>Tồn kho thực tế - Đơn đang xử lý</code>.</li>
         </ul>
       </div>
@@ -95,6 +88,11 @@ export default function Inventory() {
       return <Badge variant="outline" className="border-yellow-500 text-yellow-500">Sắp hết</Badge>;
     }
     return <Badge variant="outline" className="border-green-500 text-green-500">Còn hàng</Badge>;
+  };
+
+  // Get WooCommerce product URL
+  const getWooProductUrl = (productId: number) => {
+    return `https://hmm.vn/wp-admin/post.php?post=${productId}&action=edit`;
   };
 
   return (
@@ -125,10 +123,6 @@ export default function Inventory() {
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
-            <Button className="shrink-0" onClick={handleAddNewProduct}>
-              <Plus className="mr-2 h-4 w-4" />
-              Sản phẩm mới
-            </Button>
           </div>
           
           <Tabs defaultValue="all" className="mt-4" value={tab} onValueChange={setTab}>
@@ -143,6 +137,7 @@ export default function Inventory() {
                 products={filteredProducts} 
                 isLoading={isLoading}
                 getStockStatusBadge={getStockStatusBadge}
+                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
             <TabsContent value="instock" className="mt-4">
@@ -150,6 +145,7 @@ export default function Inventory() {
                 products={filteredProducts} 
                 isLoading={isLoading}
                 getStockStatusBadge={getStockStatusBadge}
+                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
             <TabsContent value="lowstock" className="mt-4">
@@ -157,6 +153,7 @@ export default function Inventory() {
                 products={filteredProducts} 
                 isLoading={isLoading}
                 getStockStatusBadge={getStockStatusBadge}
+                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
             <TabsContent value="outofstock" className="mt-4">
@@ -164,6 +161,7 @@ export default function Inventory() {
                 products={filteredProducts} 
                 isLoading={isLoading}
                 getStockStatusBadge={getStockStatusBadge}
+                getWooProductUrl={getWooProductUrl}
               />
             </TabsContent>
           </Tabs>
@@ -177,9 +175,10 @@ interface ProductsTableProps {
   products: (Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number })[] | undefined;
   isLoading: boolean;
   getStockStatusBadge: (product: Product & { real_stock?: number, available_to_sell?: number, pending_orders?: number }) => JSX.Element;
+  getWooProductUrl: (productId: number) => string;
 }
 
-function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTableProps) {
+function ProductsTable({ products, isLoading, getStockStatusBadge, getWooProductUrl }: ProductsTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -247,17 +246,18 @@ function ProductsTable({ products, isLoading, getStockStatusBadge }: ProductsTab
               <TableCell>{getStockStatusBadge(product)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end space-x-2">
-                  <Link to={`/inventory/product/${product.id}`}>
+                  <a href={getWooProductUrl(product.id)} target="_blank" rel="noopener noreferrer">
                     <Button variant="ghost" size="sm">
-                      <Eye className="mr-1 h-4 w-4" />
+                      <ExternalLink className="mr-1 h-4 w-4" />
                       Chi tiết
                     </Button>
-                  </Link>
-                  <Link to={`/inventory/edit/${product.id}`}>
+                  </a>
+                  <a href={`/inventory/product/${product.id}`}>
                     <Button variant="ghost" size="sm">
-                      Cập nhật
+                      <Eye className="mr-1 h-4 w-4" />
+                      Xem kho
                     </Button>
-                  </Link>
+                  </a>
                 </div>
               </TableCell>
             </TableRow>

@@ -23,7 +23,6 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +36,7 @@ import {
   DialogTrigger 
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Edit, MoreHorizontal, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Edit, ExternalLink, InfoIcon, ShoppingCart } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 
 // Format currency
@@ -89,6 +88,11 @@ export default function ProductDetail() {
       console.error("Error updating stock:", error);
     }
   };
+  
+  // Get WooCommerce product URL
+  const getWooProductUrl = (productId: number) => {
+    return `https://hmm.vn/wp-admin/post.php?post=${productId}&action=edit`;
+  };
 
   if (isLoading) {
     return (
@@ -129,12 +133,12 @@ export default function ProductDetail() {
             Quay lại danh sách
           </Button>
         </Link>
-        <Link to={`/inventory/edit/${product.id}`}>
+        <a href={getWooProductUrl(product.id)} target="_blank" rel="noopener noreferrer">
           <Button>
-            <Edit className="mr-2 h-4 w-4" />
-            Chỉnh sửa sản phẩm
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Chỉnh sửa trong WooCommerce
           </Button>
-        </Link>
+        </a>
       </div>
 
       <DashboardHeader
@@ -319,7 +323,17 @@ export default function ProductDetail() {
                     <dd className="text-sm">{product.real_stock || product.stock_quantity || 0}</dd>
                   </div>
                   <div className="flex justify-between py-2">
-                    <dt className="text-sm font-medium">Đơn đang xử lý</dt>
+                    <dt className="text-sm font-medium">
+                      <div className="flex items-center">
+                        <span>Đơn đang xử lý</span>
+                        <div className="relative ml-1 group">
+                          <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 p-2 bg-black text-white text-xs rounded w-60 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            Số lượng sản phẩm đang trong đơn hàng có trạng thái "đang xử lý", "tạm giữ", "chờ thanh toán", chưa hoàn thành.
+                          </div>
+                        </div>
+                      </div>
+                    </dt>
                     <dd className="text-sm">{product.pending_orders || 0}</dd>
                   </div>
                   <div className="flex justify-between py-2">
@@ -331,9 +345,11 @@ export default function ProductDetail() {
               
               <Separator />
               
-              <Button className="w-full" variant="secondary">
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Lịch sử nhập xuất kho
+              <Button className="w-full" variant="secondary" asChild>
+                <a href={getWooProductUrl(product.id)} target="_blank" rel="noopener noreferrer">
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Xem chi tiết trên WooCommerce
+                </a>
               </Button>
             </div>
           </CardContent>
@@ -399,9 +415,16 @@ export default function ProductDetail() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                      <a 
+                        href={`${getWooProductUrl(product.id)}&variation_id=${variation.id}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Chỉnh sửa
+                        </Button>
+                      </a>
                     </TableCell>
                   </TableRow>
                 ))}

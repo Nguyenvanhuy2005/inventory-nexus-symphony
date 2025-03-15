@@ -17,7 +17,6 @@ import DamagedStock from "./pages/DamagedStock";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import ProductDetail from "./pages/ProductDetail";
-import AddEditProduct from "./pages/AddEditProduct";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,9 +38,6 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/inventory/product/:id" element={<ProductDetail />} />
-            <Route path="/inventory/add" element={<AddEditProduct />} />
-            <Route path="/inventory/edit/:id" element={<AddEditProduct />} />
-            <Route path="/products" element={<Navigate to="/inventory" replace />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/suppliers" element={<Suppliers />} />
