@@ -13,8 +13,8 @@ export const DEFAULT_WOOCOMMERCE_CREDENTIALS = {
  * Default WordPress credentials
  */
 export const DEFAULT_WORDPRESS_CREDENTIALS = {
-  username: 'admin',
-  application_password: 'EsrK Qjd6 TyWa Q7gc IXDn 6CRw'
+  username: 'Admin',
+  application_password: '9CAM GmmH hh5q I10c xrVZ vynb'
 };
 
 /**
