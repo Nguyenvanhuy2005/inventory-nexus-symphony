@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -24,16 +23,13 @@ export default function PaymentReceipts() {
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   
-  // Get payment receipts data
   const { data: paymentReceipts = [], isLoading, isError } = useGetPaymentReceipts();
   
-  // Get selected receipt data
   const { 
     data: selectedReceipt, 
     isLoading: isLoadingReceipt 
   } = useGetPaymentReceipt(selectedReceiptId || 0);
   
-  // Filter payment receipts based on search term and tab
   const filteredReceipts = paymentReceipts.filter(item => {
     const matchesSearch = (item.receipt_id && item.receipt_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           item.entity_name?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -45,7 +41,6 @@ export default function PaymentReceipts() {
     return matchesSearch;
   });
   
-  // Get type badge
   const getTypeBadge = (type: string) => {
     switch(type) {
       case 'income':
@@ -57,9 +52,8 @@ export default function PaymentReceipts() {
     }
   };
   
-  // Get entity type badge
-  const getEntityBadge = (entity: string) => {
-    switch(entity) {
+  const getEntityBadge = (entityType: string) => {
+    switch(entityType) {
       case 'customer':
         return <Badge variant="outline">Khách hàng</Badge>;
       case 'supplier':
@@ -67,7 +61,7 @@ export default function PaymentReceipts() {
       case 'other':
         return <Badge variant="outline">Khác</Badge>;
       default:
-        return <Badge variant="outline">{entity}</Badge>;
+        return <Badge variant="outline">{entityType}</Badge>;
     }
   };
 
@@ -85,13 +79,12 @@ export default function PaymentReceipts() {
       return;
     }
     
-    // Format data for CSV export
     const reportData = filteredReceipts.map(item => ({
       'Mã phiếu': item.receipt_id || "",
       'Ngày': formatDate(item.date),
       'Loại': item.type === 'income' ? 'Thu' : 'Chi',
-      'Đối tượng': item.entity === 'customer' ? 'Khách hàng' : 
-                 item.entity === 'supplier' ? 'Nhà cung cấp' : 'Khác',
+      'Đối tượng': item.entity_type === 'customer' ? 'Khách hàng' : 
+                 item.entity_type === 'supplier' ? 'Nhà cung cấp' : 'Khác',
       'Tên': item.entity_name,
       'Số tiền': item.amount,
       'Lý do': item.description || '',
@@ -99,7 +92,6 @@ export default function PaymentReceipts() {
       'Ghi chú': item.notes || ''
     }));
     
-    // Export to CSV
     exportToCSV('phieu-thu-chi', reportData);
   };
   
@@ -192,7 +184,6 @@ export default function PaymentReceipts() {
         </Tabs>
       </Card>
 
-      {/* View Receipt Dialog */}
       {selectedReceiptId && (
         <Dialog open={!!selectedReceiptId} onOpenChange={() => setSelectedReceiptId(null)}>
           <DialogContent className="sm:max-w-[600px]">
@@ -222,7 +213,7 @@ export default function PaymentReceipts() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Đối tượng</p>
-                    <p>{getEntityBadge(selectedReceipt.entity)} {selectedReceipt.entity_name}</p>
+                    <p>{getEntityBadge(selectedReceipt.entity_type)} {selectedReceipt.entity_name}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Số tiền</p>
@@ -288,7 +279,6 @@ export default function PaymentReceipts() {
   );
 }
 
-// Table component for Payment Receipts
 interface PaymentReceiptsTableProps {
   receipts: PaymentReceipt[];
   isLoading: boolean;
@@ -365,7 +355,7 @@ function PaymentReceiptsTable({
               <TableCell className="font-medium">{item.receipt_id || "-"}</TableCell>
               <TableCell>{formatDate(item.date)}</TableCell>
               <TableCell>{getTypeBadge(item.type)}</TableCell>
-              <TableCell>{getEntityBadge(item.entity)}</TableCell>
+              <TableCell>{getEntityBadge(item.entity_type)}</TableCell>
               <TableCell>{item.entity_name}</TableCell>
               <TableCell>{formatCurrency(item.amount.toString())}</TableCell>
               <TableCell>

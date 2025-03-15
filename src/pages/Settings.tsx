@@ -62,8 +62,8 @@ export default function Settings() {
       const users = await getWordPressUsers();
       setWpUsers(Array.isArray(users) ? users : []);
     } catch (error) {
-      console.error('Error loading WordPress users:', error);
-      toast.error('Không thể tải danh sách người dùng WordPress');
+      console.error('Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Unknown error occurred');
       setWpUsers([]);
     } finally {
       setIsLoadingUsers(false);
@@ -306,7 +306,7 @@ export default function Settings() {
                       )}
                       <div>
                         <p className="font-medium">
-                          WooCommerce API: {apiStatus?.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
+                          WooCommerce API: {apiStatus?.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết n���i'}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {apiStatus?.woocommerce?.error || 'Không có thông tin lỗi'}
