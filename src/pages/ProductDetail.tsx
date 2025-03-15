@@ -35,7 +35,7 @@ import {
   DialogTrigger 
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Edit, ExternalLink, InfoIcon, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Edit, ExternalLink, InfoIcon, ShoppingCart, Image as ImageIcon } from "lucide-react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Product, ProductVariation } from "@/types/models";
 
@@ -117,7 +117,7 @@ export default function ProductDetail() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">
-              Không thể tải thông tin sản phẩm. Vui lòng thử l��i sau.
+              Không thể tải thông tin sản phẩm. Vui lòng thử lại sau.
             </p>
           </CardContent>
         </Card>
@@ -389,7 +389,7 @@ export default function ProductDetail() {
                             className="h-8 w-8 rounded-md object-cover"
                           />
                         ) : (
-                          <Image className="h-8 w-8 rounded-md" />
+                          <ImageIcon className="h-8 w-8 rounded-md" />
                         )}
                         <span>{variation.sku || `Biến thể #${variation.id}`}</span>
                       </div>

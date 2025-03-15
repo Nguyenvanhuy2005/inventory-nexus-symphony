@@ -1,6 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { useGetProducts } from '@/hooks/api-hooks';
 import { Product as ModelProduct } from '@/types/models';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 // Add a conversion function to help with type compatibility between WooCommerce Product and our model Product
 const convertWooCommerceProduct = (product: any): ModelProduct => {
@@ -31,3 +37,16 @@ const convertWooCommerceProduct = (product: any): ModelProduct => {
     attributes: product.attributes || [],
   };
 };
+
+interface CreateGoodsReceiptFormProps {
+  onSuccess?: () => void;
+}
+
+export default function CreateGoodsReceiptForm({ onSuccess }: CreateGoodsReceiptFormProps) {
+  // Form implementation goes here
+  return (
+    <div>
+      <p>Creating Goods Receipt Form - Implementation coming soon</p>
+    </div>
+  );
+}

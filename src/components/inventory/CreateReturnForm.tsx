@@ -162,7 +162,7 @@ export default function CreateReturnForm({ onSuccess, initialData }: CreateRetur
   
   const handleAddItem = (product: ModelProduct) => {
     const existingItemIndex = returnData.items.findIndex(item => 
-      item.product_id === product.id && item.variation_id === (product.variation_id || 0)
+      item.product_id === product.id
     );
     
     if (existingItemIndex >= 0) {
@@ -183,7 +183,6 @@ export default function CreateReturnForm({ onSuccess, initialData }: CreateRetur
       const newItem: ReturnItem = {
         product_id: product.id,
         product_name: product.name,
-        variation_id: product.variation_id || 0,
         sku: product.sku || "",
         quantity: 1,
         unit_price: price,
