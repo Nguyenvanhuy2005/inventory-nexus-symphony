@@ -138,7 +138,7 @@ export interface Product {
   stock_quantity?: number;
   stock_status?: string;
   categories?: Array<{id: number, name: string}>;
-  images: Array<{id: number, src: string}>; 
+  images: Array<{id?: number, src: string}>; // Changed id to optional
   attributes?: any[];
   variations?: number[];
   description?: string;
@@ -199,7 +199,7 @@ export interface ProductVariation {
     option: string;
   }[];
   image?: {
-    id: number;
+    id?: number; // Changed id to optional
     src: string;
   };
   real_stock?: number;

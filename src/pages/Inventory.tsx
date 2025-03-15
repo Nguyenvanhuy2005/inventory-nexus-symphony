@@ -90,7 +90,7 @@ export default function Inventory() {
   });
   
   const isLoading = isLoadingProducts || isLoadingStockLevels;
-  const hasError = productsError || stockLevelsError;
+  const hasError = !!productsError || !!stockLevelsError;
 
   // Function to refresh data
   const refreshData = async () => {
