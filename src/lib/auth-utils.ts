@@ -40,26 +40,25 @@ export async function checkWooCommerceAuth(): Promise<boolean> {
  * Gets authentication status for various APIs
  */
 export async function getAuthStatus() {
-  // Set default credentials in localStorage if they don't exist
   initializeDefaultCredentials();
-  
-  // Check authentication with the credentials
   const wooCommerceAuth = await checkWooCommerceAuth();
-  
+  let wpConnected = false;
+  try {
+    await fetchWordPress('/wp/v2/users', { suppressToast: true });
+    wpConnected = true;
+  } catch (error) {
+    console.error('WordPress API check failed:', error);
+  }
+
   return {
     woocommerce: {
       isAuthenticated: wooCommerceAuth,
-      hasCredentials: !!(
-        (localStorage.getItem('woocommerce_consumer_key') && 
-         localStorage.getItem('woocommerce_consumer_secret')) ||
-        (import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY && 
-         import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET)
-      )
+      hasCredentials: !!localStorage.getItem('woocommerce_consumer_key') && !!localStorage.getItem('woocommerce_consumer_secret')
     },
     status: {
       wordpress: {
-        connected: false,
-        message: "Not checked"
+        connected: wpConnected,
+        message: wpConnected ? 'Connected' : 'Failed to connect'
       }
     }
   };
