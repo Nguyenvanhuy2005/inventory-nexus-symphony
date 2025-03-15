@@ -1,628 +1,659 @@
-// Import necessary libraries and components
-import { useEffect, useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, Search, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
-
+import React, { useState, useEffect } from 'react';
+import { useGetProducts } from '@/hooks/api-hooks';
+import { Product as ModelProduct } from '@/types/models';
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { Product, Supplier, ReturnItem, Return } from "@/types/models";
-import { useQuery } from "@tanstack/react-query";
-import { fetchCustomAPI } from "@/lib/api-utils";
-import { getAllProducts } from "@/lib/woocommerce";
-import { useGetProducts } from "@/hooks/api-hooks";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatePicker } from "@/components/ui/date-picker";
+import { useToast } from "@/components/ui/use-toast";
+import { useCreateReturn } from "@/hooks/api-hooks";
+import { useGetSuppliers } from "@/hooks/api-hooks";
+import { useGetCustomers } from "@/hooks/api-hooks";
+import { Supplier, Return, ReturnItem } from "@/types/models";
+import { Trash2, Plus, Package, User, Truck, Search } from "lucide-react";
+import { format } from "date-fns";
+import { generateId } from "@/lib/utils";
 
-// Define the form schema
-const formSchema = z.object({
-  type: z.enum(["customer", "supplier"]),
-  entity_id: z.coerce.number({
-    required_error: "Vui lòng chọn đối tượng",
-  }),
-  date: z.date(),
-  reason: z.string().min(1, { message: "Vui lòng nhập lý do trả hàng" }),
-  notes: z.string().optional(),
-});
+// Add a conversion function to help with type compatibility between WooCommerce Product and our model Product
+const convertWooCommerceProduct = (product: any): ModelProduct => {
+  return {
+    id: product.id,
+    name: product.name || '',
+    slug: product.slug || '',
+    sku: product.sku || '',
+    price: product.price || '',
+    regular_price: product.regular_price || '',
+    sale_price: product.sale_price || '',
+    stock_quantity: product.stock_quantity || 0,
+    stock_status: product.stock_status || 'instock',
+    description: product.description || '',
+    short_description: product.short_description || '',
+    categories: product.categories || [],
+    manage_stock: product.manage_stock || false,
+    featured: product.featured || false,
+    images: (product.images || []).map((img: any) => ({
+      id: img.id,
+      src: img.src,
+      name: img.name || img.alt || 'product image',
+    })),
+    type: product.type || 'simple',
+    real_stock: product.stock_quantity || 0,
+    available_to_sell: product.stock_quantity || 0,
+    pending_orders: 0,
+    attributes: product.attributes || [],
+  };
+};
 
-// Define props interface
 interface CreateReturnFormProps {
   onSuccess?: () => void;
+  initialData?: Return;
 }
 
-export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
-  const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [selectedEntity, setSelectedEntity] = useState<Supplier | null>(null);
-  const [items, setItems] = useState<ReturnItem[]>([]);
+export default function CreateReturnForm({ onSuccess, initialData }: CreateReturnFormProps) {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("customer");
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const navigate = useNavigate();
-
-  // Fetch suppliers data
-  const { data: suppliersData, isLoading: isLoadingSuppliers } = useQuery({
-    queryKey: ["suppliers"],
-    queryFn: async () => {
-      try {
-        const data = await fetchCustomAPI("/suppliers");
-        return data as Supplier[];
-      } catch (error) {
-        console.error("Error fetching suppliers:", error);
-        return [];
-      }
-    }
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [products, setProducts] = useState<ModelProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<ModelProduct[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  
+  const [returnData, setReturnData] = useState<Return>({
+    return_id: initialData?.return_id || generateId("RTN"),
+    type: initialData?.type || "customer",
+    entity_id: initialData?.entity_id || 0,
+    entity_name: initialData?.entity_name || "",
+    date: initialData?.date || format(new Date(), "yyyy-MM-dd"),
+    reason: initialData?.reason || "",
+    total_amount: initialData?.total_amount || 0,
+    payment_amount: initialData?.payment_amount || 0,
+    payment_status: initialData?.payment_status || "not_refunded",
+    status: initialData?.status || "pending",
+    notes: initialData?.notes || "",
+    items: initialData?.items || []
   });
-
+  
+  const { data: productsData, isLoading: isLoadingProducts } = useGetProducts();
+  const { data: suppliersData, isLoading: isLoadingSuppliers } = useGetSuppliers();
+  const { data: customersData, isLoading: isLoadingCustomers } = useGetCustomers();
+  const createReturn = useCreateReturn();
+  
+  useEffect(() => {
+    if (productsData) {
+      const convertedProducts = (productsData || []).map(convertWooCommerceProduct);
+      setProducts(convertedProducts);
+      setFilteredProducts(convertedProducts);
+    }
+  }, [productsData]);
+  
   useEffect(() => {
     if (suppliersData) {
       setSuppliers(suppliersData);
     }
   }, [suppliersData]);
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      type: "supplier",
-      date: new Date(),
-      reason: "",
-      notes: "",
-    },
-  });
-
-  // Watch the type and entity_id fields
-  const type = form.watch("type");
-  const entity_id = form.watch("entity_id");
-
-  // Update selected entity when type and entity_id change
+  
   useEffect(() => {
-    if (type === "supplier" && entity_id) {
-      const supplier = suppliers.find((s) => s.id === entity_id);
-      setSelectedEntity(supplier || null);
+    if (customersData) {
+      setCustomers(customersData);
+    }
+  }, [customersData]);
+  
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setFilteredProducts(products);
     } else {
-      setSelectedEntity(null);
+      const filtered = products.filter(product => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      setFilteredProducts(filtered);
     }
-  }, [type, entity_id, suppliers]);
-
-  // Calculate total amount
-  const totalAmount = items.reduce(
-    (total, item) => total + item.quantity * (item.unit_price || item.price || 0),
-    0
-  );
-
-  // Handle product search
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
-
-    setIsSearching(true);
-    try {
-      const results = await getAllProducts({ search: searchTerm, per_page: "10" });
-      console.log("Search results:", results);
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Error searching products:", error);
-      toast.error("Lỗi khi tìm kiếm sản phẩm");
-    } finally {
-      setIsSearching(false);
+  }, [searchTerm, products]);
+  
+  useEffect(() => {
+    if (selectedDate) {
+      setReturnData(prev => ({
+        ...prev,
+        date: format(selectedDate, "yyyy-MM-dd")
+      }));
     }
+  }, [selectedDate]);
+  
+  useEffect(() => {
+    if (returnData.type === "customer" && initialData?.entity_id) {
+      const customer = customers.find(c => c.id === initialData.entity_id);
+      if (customer) {
+        setSelectedEntity(customer);
+      }
+    } else if (returnData.type === "supplier" && initialData?.entity_id) {
+      const supplier = suppliers.find(s => s.id === initialData.entity_id);
+      if (supplier) {
+        setSelectedEntity(supplier);
+      }
+    }
+  }, [returnData.type, initialData, customers, suppliers]);
+  
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setReturnData(prev => ({
+      ...prev,
+      type: value as "customer" | "supplier",
+      entity_id: 0,
+      entity_name: ""
+    }));
+    setSelectedEntity(null);
   };
-
-  // Add product to items
-  const addProduct = (product: Product) => {
-    // Check if product already exists in items
-    const existingItemIndex = items.findIndex(
-      (item) => item.product_id === product.id
+  
+  const handleEntitySelect = (entity: any) => {
+    setSelectedEntity(entity);
+    setReturnData(prev => ({
+      ...prev,
+      entity_id: entity.id,
+      entity_name: entity.name || entity.first_name + " " + entity.last_name
+    }));
+  };
+  
+  const handleAddItem = (product: ModelProduct) => {
+    const existingItemIndex = returnData.items.findIndex(item => 
+      item.product_id === product.id && item.variation_id === (product.variation_id || 0)
     );
-
+    
     if (existingItemIndex >= 0) {
-      // Update quantity if product already exists
-      const updatedItems = [...items];
-      updatedItems[existingItemIndex] = {
-        ...updatedItems[existingItemIndex],
-        quantity: updatedItems[existingItemIndex].quantity + 1,
-      };
-      setItems(updatedItems);
+      // Update existing item
+      const updatedItems = [...returnData.items];
+      updatedItems[existingItemIndex].quantity += 1;
+      updatedItems[existingItemIndex].total_price = 
+        updatedItems[existingItemIndex].quantity * updatedItems[existingItemIndex].unit_price;
+      
+      setReturnData(prev => ({
+        ...prev,
+        items: updatedItems,
+        total_amount: calculateTotal(updatedItems)
+      }));
     } else {
-      // Add new product to items
-      setItems([
-        ...items,
-        {
-          product_id: product.id,
-          variation_id: 0,
-          product_name: product.name,
-          name: product.name,
-          sku: product.sku || "",
-          quantity: 1,
-          unit_price: parseFloat(product.price || "0"),
-          price: parseFloat(product.price || "0"),
-          total_price: parseFloat(product.price || "0"),
-          subtotal: parseFloat(product.price || "0"),
-          reason: "",
-        },
-      ]);
+      // Add new item
+      const price = parseFloat(product.price || product.regular_price || "0");
+      const newItem: ReturnItem = {
+        product_id: product.id,
+        product_name: product.name,
+        variation_id: product.variation_id || 0,
+        sku: product.sku || "",
+        quantity: 1,
+        unit_price: price,
+        total_price: price
+      };
+      
+      const updatedItems = [...returnData.items, newItem];
+      
+      setReturnData(prev => ({
+        ...prev,
+        items: updatedItems,
+        total_amount: calculateTotal(updatedItems)
+      }));
     }
-
-    // Close the dialog
-    setIsDialogOpen(false);
-    setSearchTerm("");
-    setSearchResults([]);
   };
-
-  // Update item quantity
-  const updateItemQuantity = (index: number, quantity: number) => {
-    if (quantity <= 0) return;
-
-    const updatedItems = [...items];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      quantity,
-      total_price: quantity * updatedItems[index].unit_price,
-      subtotal: quantity * updatedItems[index].unit_price,
-    };
-    setItems(updatedItems);
+  
+  const handleRemoveItem = (index: number) => {
+    const updatedItems = returnData.items.filter((_, i) => i !== index);
+    setReturnData(prev => ({
+      ...prev,
+      items: updatedItems,
+      total_amount: calculateTotal(updatedItems)
+    }));
   };
-
-  // Update item price
-  const updateItemPrice = (index: number, price: number) => {
-    if (price < 0) return;
-
-    const updatedItems = [...items];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      unit_price: price,
-      price: price,
-      total_price: updatedItems[index].quantity * price,
-      subtotal: updatedItems[index].quantity * price,
-    };
-    setItems(updatedItems);
+  
+  const handleQuantityChange = (index: number, quantity: number) => {
+    if (quantity < 1) quantity = 1;
+    
+    const updatedItems = [...returnData.items];
+    updatedItems[index].quantity = quantity;
+    updatedItems[index].total_price = quantity * updatedItems[index].unit_price;
+    
+    setReturnData(prev => ({
+      ...prev,
+      items: updatedItems,
+      total_amount: calculateTotal(updatedItems)
+    }));
   };
-
-  // Update item reason
-  const updateItemReason = (index: number, reason: string) => {
-    const updatedItems = [...items];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      reason,
-    };
-    setItems(updatedItems);
+  
+  const handlePriceChange = (index: number, price: number) => {
+    if (price < 0) price = 0;
+    
+    const updatedItems = [...returnData.items];
+    updatedItems[index].unit_price = price;
+    updatedItems[index].total_price = updatedItems[index].quantity * price;
+    
+    setReturnData(prev => ({
+      ...prev,
+      items: updatedItems,
+      total_amount: calculateTotal(updatedItems)
+    }));
   };
-
-  // Remove item
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  
+  const calculateTotal = (items: ReturnItem[]) => {
+    return items.reduce((sum, item) => sum + item.total_price, 0);
   };
-
-  // Handle form submission
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    if (items.length === 0) {
-      toast.error("Vui lòng thêm ít nhất một sản phẩm");
+  
+  const handlePaymentAmountChange = (amount: number) => {
+    if (amount < 0) amount = 0;
+    if (amount > returnData.total_amount) amount = returnData.total_amount;
+    
+    let paymentStatus: "refunded" | "partial_refunded" | "not_refunded" = "not_refunded";
+    
+    if (amount === 0) {
+      paymentStatus = "not_refunded";
+    } else if (amount === returnData.total_amount) {
+      paymentStatus = "refunded";
+    } else {
+      paymentStatus = "partial_refunded";
+    }
+    
+    setReturnData(prev => ({
+      ...prev,
+      payment_amount: amount,
+      payment_status: paymentStatus
+    }));
+  };
+  
+  const handleSubmit = async () => {
+    if (!returnData.entity_id) {
+      toast({
+        title: "Lỗi",
+        description: `Vui lòng chọn ${returnData.type === "customer" ? "khách hàng" : "nhà cung cấp"}`,
+        variant: "destructive"
+      });
       return;
     }
-
-    setLoading(true);
-    try {
-      // Prepare items data for submission
-      const itemsData = items.map((item) => ({
-        product_id: item.product_id,
-        variation_id: item.variation_id,
-        product_name: item.product_name || item.name || "",
-        sku: item.sku,
-        quantity: item.quantity,
-        unit_price: item.unit_price || item.price || 0,
-        price: item.price || 0,
-        total_price: item.total_price,
-        subtotal: item.subtotal,
-        reason: item.reason || ""
-      }));
-
-      // Find entity name
-      let entityName = "";
-      if (data.type === "supplier") {
-        entityName = suppliers.find((s) => s.id === data.entity_id)?.name || "";
-      } else {
-        // For customer returns, this would need to be fetched from customers
-        entityName = "Customer"; // Placeholder
-      }
-
-      // Prepare return data
-      const returnData: Omit<Return, 'id' | 'created_at' | 'updated_at'> = {
-        return_id: `RTN-${Date.now()}`,
-        type: data.type,
-        entity_id: data.entity_id,
-        entity_name: entityName,
-        date: format(data.date, "yyyy-MM-dd HH:mm:ss"),
-        reason: data.reason,
-        total_amount: totalAmount,
-        payment_amount: 0, // No payment by default
-        payment_status: "not_refunded",
-        status: "completed",
-        notes: data.notes || "",
-        items: itemsData,
-      };
-
-      // Submit the data
-      await fetchCustomAPI("/returns", {
-        method: "POST",
-        body: returnData,
+    
+    if (returnData.items.length === 0) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng thêm ít nhất một sản phẩm",
+        variant: "destructive"
       });
-
-      toast.success("Đã tạo phiếu trả hàng thành công");
+      return;
+    }
+    
+    try {
+      await createReturn.mutateAsync(returnData);
+      toast({
+        title: "Thành công",
+        description: "Đã tạo phiếu trả hàng thành công",
+      });
+      
       if (onSuccess) {
         onSuccess();
-      } else {
-        navigate("/returns");
       }
     } catch (error) {
       console.error("Error creating return:", error);
-      toast.error("Lỗi khi tạo phiếu trả hàng");
-    } finally {
-      setLoading(false);
+      toast({
+        title: "Lỗi",
+        description: "Không thể tạo phiếu trả hàng. Vui lòng thử lại sau.",
+        variant: "destructive"
+      });
     }
   };
-
+  
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Loại phiếu trả</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn loại phiếu" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="supplier">Trả hàng cho NCC</SelectItem>
-                    <SelectItem value="customer">Khách trả hàng</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {type === "supplier" && (
-            <FormField
-              control={form.control}
-              name="entity_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nhà cung cấp</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    value={field.value?.toString() || ""}
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="customer" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Khách hàng trả hàng
+          </TabsTrigger>
+          <TabsTrigger value="supplier" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            Trả hàng nhà cung cấp
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="customer" className="space-y-4 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Mã phiếu trả</Label>
+              <Input 
+                value={returnData.return_id} 
+                onChange={(e) => setReturnData({...returnData, return_id: e.target.value})}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Ngày trả hàng</Label>
+              <DatePicker 
+                date={selectedDate} 
+                setDate={setSelectedDate} 
+                className="mt-1"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <Label>Chọn khách hàng</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1">
+              <div className="md:col-span-3">
+                <Input
+                  placeholder="Tìm kiếm khách hàng..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              {isLoadingCustomers ? (
+                <div className="md:col-span-3 text-center py-4">Đang tải danh sách khách hàng...</div>
+              ) : (
+                customers
+                  .filter(customer => 
+                    customer.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    customer.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .slice(0, 6)
+                  .map(customer => (
+                    <Card 
+                      key={customer.id}
+                      className={`cursor-pointer hover:border-primary transition-colors ${
+                        selectedEntity?.id === customer.id ? 'border-primary bg-primary/5' : ''
+                      }`}
+                      onClick={() => handleEntitySelect(customer)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="font-medium">{customer.first_name} {customer.last_name}</div>
+                        <div className="text-sm text-muted-foreground">{customer.email}</div>
+                        {customer.billing?.phone && (
+                          <div className="text-sm">{customer.billing.phone}</div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+              )}
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="supplier" className="space-y-4 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Mã phiếu trả</Label>
+              <Input 
+                value={returnData.return_id} 
+                onChange={(e) => setReturnData({...returnData, return_id: e.target.value})}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Ngày trả hàng</Label>
+              <DatePicker 
+                date={selectedDate} 
+                setDate={setSelectedDate} 
+                className="mt-1"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <Label>Chọn nhà cung cấp</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-1">
+              <div className="md:col-span-3">
+                <Input
+                  placeholder="Tìm kiếm nhà cung cấp..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              {isLoadingSuppliers ? (
+                <div className="md:col-span-3 text-center py-4">Đang tải danh sách nhà cung cấp...</div>
+              ) : (
+                suppliers
+                  .filter(supplier => 
+                    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    supplier.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .slice(0, 6)
+                  .map(supplier => (
+                    <Card 
+                      key={supplier.id}
+                      className={`cursor-pointer hover:border-primary transition-colors ${
+                        selectedEntity?.id === supplier.id ? 'border-primary bg-primary/5' : ''
+                      }`}
+                      onClick={() => handleEntitySelect(supplier)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="font-medium">{supplier.name}</div>
+                        {supplier.email && (
+                          <div className="text-sm text-muted-foreground">{supplier.email}</div>
+                        )}
+                        {supplier.phone && (
+                          <div className="text-sm">{supplier.phone}</div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+      
+      {selectedEntity && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Thông tin trả hàng</CardTitle>
+            <CardDescription>
+              {returnData.type === "customer" 
+                ? `Khách hàng: ${selectedEntity.first_name} ${selectedEntity.last_name}`
+                : `Nhà cung cấp: ${selectedEntity.name}`
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="reason">Lý do trả hàng</Label>
+              <Textarea
+                id="reason"
+                placeholder="Nhập lý do trả hàng..."
+                value={returnData.reason}
+                onChange={(e) => setReturnData({...returnData, reason: e.target.value})}
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label>Tìm kiếm sản phẩm</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  placeholder="Tìm theo tên hoặc SKU..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+                <Button variant="outline" size="icon">
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              {isLoadingProducts ? (
+                <div className="col-span-full text-center py-4">Đang tải danh sách sản phẩm...</div>
+              ) : (
+                filteredProducts.slice(0, 8).map(product => (
+                  <Card 
+                    key={product.id}
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => handleAddItem(product)}
                   >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn nhà cung cấp" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {isLoadingSuppliers ? (
-                        <div className="flex items-center justify-center p-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="ml-2">Đang tải...</span>
-                        </div>
-                      ) : (
-                        suppliers.map((supplier) => (
-                          <SelectItem
-                            key={supplier.id}
-                            value={supplier.id.toString()}
+                    <CardContent className="p-4 flex flex-col items-center text-center">
+                      <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center mb-2">
+                        {product.images && product.images[0] ? (
+                          <img 
+                            src={product.images[0].src} 
+                            alt={product.name} 
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        ) : (
+                          <Package className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="font-medium line-clamp-2">{product.name}</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {product.sku ? `SKU: ${product.sku}` : ''}
+                      </div>
+                      <div className="mt-1 font-medium">
+                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+                          .format(parseFloat(product.price || product.regular_price || "0"))}
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="mt-2 w-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddItem(product);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Thêm
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+            
+            <div className="mt-6">
+              <h3 className="text-lg font-medium mb-2">Danh sách sản phẩm trả</h3>
+              
+              {returnData.items.length === 0 ? (
+                <div className="text-center py-8 border rounded-md bg-muted/30">
+                  <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <p className="mt-2 text-muted-foreground">Chưa có sản phẩm nào được thêm</p>
+                  <p className="text-sm text-muted-foreground">Tìm kiếm và chọn sản phẩm để thêm vào phiếu trả</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sản phẩm</TableHead>
+                      <TableHead className="w-[100px] text-right">Số lượng</TableHead>
+                      <TableHead className="w-[150px] text-right">Đơn giá</TableHead>
+                      <TableHead className="w-[150px] text-right">Thành tiền</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {returnData.items.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <div className="font-medium">{item.product_name}</div>
+                          {item.sku && <div className="text-sm text-muted-foreground">SKU: {item.sku}</div>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+                            className="w-20 ml-auto"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.unit_price}
+                            onChange={(e) => handlePriceChange(index, parseFloat(e.target.value) || 0)}
+                            className="w-28 ml-auto"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+                            .format(item.total_price)}
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleRemoveItem(index)}
                           >
-                            {supplier.name}
-                          </SelectItem>
-                        ))
-                      )}
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              
+              <div className="mt-4 flex flex-col gap-2 items-end">
+                <div className="flex justify-between w-full md:w-1/2 py-2">
+                  <span className="font-medium">Tổng tiền hàng:</span>
+                  <span className="font-medium">
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+                      .format(returnData.total_amount)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center w-full md:w-1/2 py-2">
+                  <span className="font-medium">Số tiền hoàn trả:</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={returnData.total_amount}
+                    value={returnData.payment_amount}
+                    onChange={(e) => handlePaymentAmountChange(parseFloat(e.target.value) || 0)}
+                    className="w-40"
+                  />
+                </div>
+                
+                <div className="flex justify-between w-full md:w-1/2 py-2">
+                  <span className="font-medium">Trạng thái thanh toán:</span>
+                  <Select
+                    value={returnData.payment_status}
+                    onValueChange={(value) => setReturnData({
+                      ...returnData, 
+                      payment_status: value as "refunded" | "partial_refunded" | "not_refunded"
+                    })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="refunded">Đã hoàn tiền</SelectItem>
+                      <SelectItem value="partial_refunded">Hoàn tiền một phần</SelectItem>
+                      <SelectItem value="not_refunded">Chưa hoàn tiền</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Ngày trả</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "dd/MM/yyyy")
-                        ) : (
-                          <span>Chọn ngày</span>
-                        )}
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="reason"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Lý do trả hàng</FormLabel>
-              <FormControl>
-                <Input placeholder="Nhập lý do trả hàng" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Card className="p-4">
-          <div className="flex justify-between mb-4">
-            <h3 className="text-lg font-medium">Sản phẩm</h3>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Thêm sản phẩm
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Tìm kiếm sản phẩm</DialogTitle>
-                </DialogHeader>
-                <div className="flex gap-2 mt-4">
-                  <Input
-                    placeholder="Nhập tên hoặc mã sản phẩm"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSearch();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                  >
-                    {isSearching ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
-                    <span className="ml-2">Tìm</span>
-                  </Button>
                 </div>
-                <div className="mt-4 max-h-96 overflow-auto">
-                  {searchResults.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Tên sản phẩm</TableHead>
-                          <TableHead>Mã</TableHead>
-                          <TableHead>Giá</TableHead>
-                          <TableHead></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {searchResults.map((product) => (
-                          <TableRow key={product.id}>
-                            <TableCell>{product.name}</TableCell>
-                            <TableCell>{product.sku}</TableCell>
-                            <TableCell>
-                              {parseFloat(product.price || "0").toLocaleString()} đ
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => addProduct(product)}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : searchTerm && !isSearching ? (
-                    <p className="text-center text-muted-foreground py-4">
-                      Không tìm thấy sản phẩm nào
-                    </p>
-                  ) : null}
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {items.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tên sản phẩm</TableHead>
-                  <TableHead>Mã</TableHead>
-                  <TableHead>Số lượng</TableHead>
-                  <TableHead>Đơn giá</TableHead>
-                  <TableHead>Lý do</TableHead>
-                  <TableHead>Thành tiền</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.product_name || item.name}</TableCell>
-                    <TableCell>{item.sku}</TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateItemQuantity(index, parseInt(e.target.value))
-                        }
-                        className="w-20"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.unit_price || item.price || 0}
-                        onChange={(e) =>
-                          updateItemPrice(index, parseFloat(e.target.value))
-                        }
-                        className="w-28"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="text"
-                        value={item.reason || ""}
-                        onChange={(e) =>
-                          updateItemReason(index, e.target.value)
-                        }
-                        className="w-40"
-                        placeholder="Lý do trả"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {(
-                        item.quantity *
-                        (item.unit_price || item.price || 0)
-                      ).toLocaleString()}{" "}
-                      đ
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow>
-                  <TableCell colSpan={5} className="text-right font-medium">
-                    Tổng cộng:
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {totalAmount.toLocaleString()} đ
-                  </TableCell>
-                  <TableCell></TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              Chưa có sản phẩm nào. Vui lòng thêm sản phẩm.
+              </div>
             </div>
-          )}
+            
+            <div className="mt-4">
+              <Label htmlFor="notes">Ghi chú</Label>
+              <Textarea
+                id="notes"
+                placeholder="Nhập ghi chú nếu có..."
+                value={returnData.notes}
+                onChange={(e) => setReturnData({...returnData, notes: e.target.value})}
+                className="mt-1"
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="outline">Hủy</Button>
+            <Button onClick={handleSubmit} disabled={createReturn.isPending}>
+              {createReturn.isPending ? "Đang xử lý..." : "Tạo phiếu trả hàng"}
+            </Button>
+          </CardFooter>
         </Card>
-
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Ghi chú</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Nhập ghi chú cho phiếu trả hàng"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            className="w-full md:w-auto"
-            disabled={loading || items.length === 0}
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <Plus className="mr-2 h-4 w-4" />
-            Tạo phiếu trả hàng
-          </Button>
-        </div>
-      </form>
-    </Form>
+      )}
+    </div>
   );
 }

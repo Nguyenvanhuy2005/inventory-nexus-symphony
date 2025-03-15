@@ -4,7 +4,8 @@ import { checkWooCommerceAuth, initializeDefaultCredentials } from "@/lib/auth-u
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
 import { toast } from "sonner";
 import { PaymentReceipt, Product, ProductVariation, StockTransaction, Supplier } from "@/types/models";
-import { useMockData } from "@/hooks/use-mock-data";
+import { mockSuppliers } from "@/lib/mock-data-suppliers";
+import { mockPaymentReceipts } from "@/lib/mock-data-payment-receipts";
 
 // Define types for the return values of our query hooks
 type ApiStatus = {
@@ -284,9 +285,7 @@ export function useCreateStockAdjustment() {
  * Hook to get all suppliers
  */
 export function useGetSuppliers() {
-  const { suppliers: mockSuppliers } = useMockData();
-  
-  return useQuery({
+  return useQuery<Supplier[], Error>({
     queryKey: ['suppliers'],
     queryFn: async () => {
       try {
@@ -536,8 +535,6 @@ export function useCreateDamagedStock() {
  * Hook to get all payment receipts
  */
 export function useGetPaymentReceipts() {
-  const { paymentReceipts: mockPaymentReceipts } = useMockData();
-  
   return useQuery<PaymentReceipt[], Error>({
     queryKey: ['payment-receipts'],
     queryFn: async () => {

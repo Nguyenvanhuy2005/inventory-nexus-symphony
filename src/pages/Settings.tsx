@@ -297,7 +297,9 @@ export default function Settings() {
                           WordPress API: {apiStatus && apiStatus.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {apiStatus && apiStatus.status?.message || 'Không có thông tin trạng thái'}
+                          {apiStatus && apiStatus.status && typeof apiStatus.status === 'object' && 'message' in apiStatus.status 
+                            ? apiStatus.status.message as string 
+                            : 'Không có thông tin trạng thái'}
                         </p>
                       </div>
                     </div>
@@ -310,7 +312,7 @@ export default function Settings() {
                       )}
                       <div>
                         <p className="font-medium">
-                          WooCommerce API: {apiStatus && apiStatus.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết n���i'}
+                          WooCommerce API: {apiStatus && apiStatus.woocommerce?.isConnected ? 'Đã kết nối' : 'Lỗi kết nối'}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {apiStatus && apiStatus.woocommerce?.error || 'Không có thông tin lỗi'}
@@ -318,9 +320,9 @@ export default function Settings() {
                       </div>
                     </div>
                     
-                    {apiStatus && !apiStatus.isConnected && (
+                    {apiStatus && !apiStatus.isConnected && apiStatus.error && (
                       <div className="text-sm mt-2 text-red-500 flex items-center gap-2">
-                        <XCircle className="h-4 w-4" />
+                        <AlertTriangle className="h-4 w-4" />
                         <span>
                           {typeof apiStatus.error === 'string' 
                             ? apiStatus.error 
