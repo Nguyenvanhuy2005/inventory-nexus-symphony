@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { initializeDefaultCredentials } from "./auth-utils";
 
@@ -68,6 +67,10 @@ export async function checkAPIStatus() {
     console.error('Error checking API status:', error);
     return { 
       status: { 
+        wordpress: {
+          connected: false,
+          message: error instanceof Error ? error.message : 'Unknown error'
+        },
         status: 'error', 
         message: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString() 

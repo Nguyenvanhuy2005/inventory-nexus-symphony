@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -5,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { 
   CheckCircle, 
@@ -33,7 +33,7 @@ export default function Settings() {
   const apiStatus = useCheckAPIStatus();
   
   useEffect(() => {
-    if (apiStatus.isSuccess) {
+    if (apiStatus.isSuccess && apiStatus.data) {
       console.log("API Status:", apiStatus.data);
     }
   }, [apiStatus.isSuccess, apiStatus.data]);
@@ -100,29 +100,15 @@ export default function Settings() {
     toast({ description: "Đã sao chép Mật khẩu ứng dụng vào clipboard." });
   };
 
-  const isConnected = apiStatus?.data?.status ? 
-                    (typeof apiStatus.data.status === 'object' && 
-                    apiStatus.data.status !== null &&
-                    'wordpress' in apiStatus.data.status && 
-                    typeof apiStatus.data.status.wordpress === 'object' && 
-                    apiStatus.data.status.wordpress !== null &&
-                    'connected' in apiStatus.data.status.wordpress ? 
-                    apiStatus.data.status.wordpress.connected : false) : false;
+  // Safely check for nested properties with null checks
+  const isConnected = apiStatus.data?.status ? 
+    (apiStatus.data.status.wordpress?.connected || false) : false;
                       
-  const wordpressStatus = apiStatus?.data?.status ? 
-                        (typeof apiStatus.data.status === 'object' && 
-                        apiStatus.data.status !== null &&
-                        'wordpress' in apiStatus.data.status && 
-                        typeof apiStatus.data.status.wordpress === 'object' && 
-                        apiStatus.data.status.wordpress !== null &&
-                        'message' in apiStatus.data.status.wordpress ? 
-                        apiStatus.data.status.wordpress.message : "Unknown status") : "Unknown status";
+  const wordpressStatus = apiStatus.data?.status ? 
+    (apiStatus.data.status.wordpress?.message || "Unknown status") : "Unknown status";
 
-  const isWooCommerceAuthenticated = apiStatus?.data?.woocommerce ? 
-                                  (typeof apiStatus.data.woocommerce === 'object' && 
-                                  apiStatus.data.woocommerce !== null &&
-                                  'isAuthenticated' in apiStatus.data.woocommerce ? 
-                                  apiStatus.data.woocommerce.isAuthenticated : false) : false;
+  const isWooCommerceAuthenticated = apiStatus.data?.woocommerce ? 
+    (apiStatus.data.woocommerce.isAuthenticated || false) : false;
   
   return (
     <div className="space-y-6">
@@ -303,4 +289,3 @@ export default function Settings() {
     </div>
   );
 }
-
