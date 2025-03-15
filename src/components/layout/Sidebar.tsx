@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Settings, 
   Tag,
+  Boxes,
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -63,16 +64,16 @@ export default function Sidebar() {
               isActive={path === '/'}
             />
             <SidebarItem
-              icon={<Package className="h-4 w-4" />}
-              label="Quản lý kho"
-              href="/inventory"
-              isActive={path === '/inventory'}
+              icon={<Tag className="h-4 w-4" />}
+              label="Quản lý sản phẩm"
+              href="/products"
+              isActive={path.startsWith('/products')}
             />
             <SidebarItem
-              icon={<Tag className="h-4 w-4" />}
-              label="Sản phẩm"
-              href="/products"
-              isActive={path === '/products'}
+              icon={<Boxes className="h-4 w-4" />}
+              label="Quản lý kho hàng"
+              href="/stock-management"
+              isActive={path.startsWith('/stock-management')}
             />
             <SidebarItem
               icon={<ShoppingCart className="h-4 w-4" />}

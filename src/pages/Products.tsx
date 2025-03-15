@@ -17,7 +17,7 @@ import { toast } from "sonner";
 export default function Products() {
   // Use useQuery to fetch products directly from WooCommerce
   const { data: products, isLoading, refetch, error } = useQuery({
-    queryKey: ['products'],
+    queryKey: ['wc-products'],
     queryFn: async () => {
       try {
         const response = await fetchWooCommerce('/products', {
@@ -84,7 +84,7 @@ export default function Products() {
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
-            <Link to="/inventory/add-product">
+            <Link to="/products/add">
               <Button className="shrink-0">
                 <Plus className="mr-2 h-4 w-4" />
                 Sản phẩm mới
@@ -165,7 +165,7 @@ export default function Products() {
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Link to={`/inventory/product/${product.id}`}>
+                      <Link to={`/products/product/${product.id}`}>
                         <Button variant="ghost" size="icon">
                           <Edit className="h-4 w-4" />
                         </Button>
