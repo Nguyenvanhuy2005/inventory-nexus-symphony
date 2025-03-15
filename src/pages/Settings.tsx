@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,6 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 
-// Validation schema for API settings
 const apiSettingsSchema = z.object({
   woocommerce_url: z.string().url("URL không hợp lệ"),
   consumer_key: z.string().min(1, "Consumer key không được để trống"),
@@ -48,14 +46,12 @@ const apiSettingsSchema = z.object({
 
 type ApiSettingsFormValues = z.infer<typeof apiSettingsSchema>;
 
-// Cấu trúc dữ liệu role cho user
 interface Role {
   id: string;
   name: string;
   capabilities: Record<string, boolean>;
 }
 
-// Cấu trúc dữ liệu user từ WordPress
 interface WPUser {
   id: number;
   name: string;
@@ -78,14 +74,12 @@ export default function Settings() {
   const [detailedStatus, setDetailedStatus] = useState<any>(null);
   const [pluginInstallError, setPluginInstallError] = useState<string | null>(null);
 
-  // Fetch WordPress users
   const { data: wpUsers = [], isLoading: isLoadingUsers } = useQuery({
     queryKey: ['wordpress-users'],
     queryFn: getWordPressUsers,
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
-  // Setup form
   const form = useForm<ApiSettingsFormValues>({
     resolver: zodResolver(apiSettingsSchema),
     defaultValues: {
@@ -97,7 +91,6 @@ export default function Settings() {
     }
   });
 
-  // Load saved settings on component mount
   useEffect(() => {
     try {
       const savedSettings = localStorage.getItem('api_settings');
@@ -105,7 +98,6 @@ export default function Settings() {
         const settings = JSON.parse(savedSettings);
         form.reset(settings);
         
-        // Check API status
         testConnections();
       }
     } catch (error) {
@@ -113,21 +105,17 @@ export default function Settings() {
     }
   }, []);
   
-  // Handle form submission
   const onSubmit = (data: ApiSettingsFormValues) => {
     console.log("API Settings:", data);
-    // Lưu các giá trị vào localStorage để có thể sử dụng lại
     localStorage.setItem('api_settings', JSON.stringify(data));
     toast.success("Cài đặt API đã được lưu");
     
-    // Kiểm tra kết nối sau khi lưu
     setTimeout(() => {
       toast.info("Đang kiểm tra kết nối với cài đặt mới...");
       testConnections();
     }, 1000);
   };
   
-  // Test API connections
   const testConnections = async () => {
     setIsTesting(true);
     setApiStatus({
@@ -138,7 +126,6 @@ export default function Settings() {
     setPluginInstallError(null);
     
     try {
-      // Test WooCommerce API
       await fetchWooCommerce('/products?per_page=1', { suppressToast: true });
       setApiStatus(prev => ({ ...prev, woocommerce: true }));
     } catch (error) {
@@ -147,7 +134,6 @@ export default function Settings() {
     }
     
     try {
-      // Test WordPress API
       await fetchWordPress('/posts?per_page=1', { suppressToast: true });
       setApiStatus(prev => ({ ...prev, wordpress: true }));
     } catch (error) {
@@ -156,7 +142,6 @@ export default function Settings() {
     }
     
     try {
-      // Test Custom API and get detailed status
       const statusResult = await checkAPIStatus();
       setApiStatus(prev => ({ ...prev, custom: statusResult.isConnected }));
       setDetailedStatus(statusResult.status);
@@ -182,15 +167,12 @@ export default function Settings() {
       <AlertCircle className="h-5 w-5 text-red-500" />;
   };
 
-  // Mở dialog chỉnh sửa người dùng
   const handleEditUser = (user: WPUser) => {
     setSelectedUser(user);
     setOpenUserDialog(true);
   };
   
-  // Tải file plugin
   const handleDownloadPlugin = () => {
-    // Tạo một liên kết để tải xuống file plugin từ public folder
     const link = document.createElement('a');
     link.href = '/hmm-custom-api/hmm-custom-api.php';
     link.download = 'hmm-custom-api.php';
@@ -439,14 +421,14 @@ export default function Settings() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : wpUsers.length === 0 ? (
+                      ) : Array.isArray(wpUsers) && wpUsers.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-8">
                             Không tìm thấy người dùng nào
                           </TableCell>
                         </TableRow>
                       ) : (
-                        wpUsers.map((user: any) => (
+                        Array.isArray(wpUsers) && wpUsers.map((user: WPUser) => (
                           <TableRow key={user.id}>
                             <TableCell>
                               {user.avatar_urls?.["48"] ? (
@@ -525,7 +507,6 @@ export default function Settings() {
         </Tabs>
       </Card>
       
-      {/* Plugin Info Dialog */}
       <Dialog open={openPluginInfo} onOpenChange={setOpenPluginInfo}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -604,7 +585,6 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
       
-      {/* Plugin Code Dialog */}
       <Dialog open={openPluginCode} onOpenChange={setOpenPluginCode}>
         <DialogContent className="sm:max-w-[90vw] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -655,7 +635,7 @@ export default function Settings() {
  * Text Domain: hmm-custom-api
  */
 
-// Đảm bảo không truy cập trực tiếp
+// ��ảm bảo không truy cập trực tiếp
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -776,7 +756,6 @@ function hmm_create_suppliers_table() {
         </DialogContent>
       </Dialog>
       
-      {/* User Edit Dialog */}
       <Dialog open={openUserDialog} onOpenChange={setOpenUserDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>

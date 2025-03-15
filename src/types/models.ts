@@ -138,7 +138,7 @@ export interface Product {
   stock_quantity?: number;
   stock_status?: string;
   categories?: Array<{id: number, name: string}>;
-  images?: Array<{id: number, src: string}>;
+  images: Array<{id: number, src: string}>; // Made 'id' required and images non-optional
   attributes?: any[];
   variations?: number[];
   description?: string;
