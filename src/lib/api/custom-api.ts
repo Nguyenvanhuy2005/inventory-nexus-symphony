@@ -19,6 +19,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     // Prepare authentication headers
     const headers = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...options.headers
     };
     
@@ -47,6 +48,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       
     console.info(`Fetching ${isDatabaseApiCall ? 'Database' : 'Custom'} API: ${endpoint}`, {
       url,
+      method: fetchOptions.method,
       hasAuth: !!authToken,
       username: username
     });
@@ -81,6 +83,40 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     }
     
     throw error;
+  }
+}
+
+/**
+ * Check Database API connection and authentication
+ * @returns Promise with auth status
+ */
+export async function checkDatabaseApiAuth() {
+  try {
+    const result = await fetchCustomAPI('/hmm/v1/status', { suppressToast: true });
+    return {
+      isAuthenticated: true,
+      error: null,
+      version: result.version,
+      tables: result.custom_tables || []
+    };
+  } catch (error) {
+    console.error('Database API authentication check failed:', error);
+    
+    let errorMessage = 'Không thể kết nối tới Database API';
+    if (error instanceof Error) {
+      if (error.message.includes('401')) {
+        errorMessage = 'Lỗi xác thực: Thông tin đăng nhập không hợp lệ';
+      } else if (error.message.includes('404')) {
+        errorMessage = 'Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt';
+      }
+    }
+    
+    return {
+      isAuthenticated: false,
+      error: errorMessage,
+      version: null,
+      tables: []
+    };
   }
 }
 
