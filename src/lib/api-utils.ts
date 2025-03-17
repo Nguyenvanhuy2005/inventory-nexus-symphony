@@ -103,8 +103,15 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    const url = `${API_BASE_URL}/custom/v1${endpoint}`;
-    console.info(`Fetching Custom API: ${endpoint}`, url);
+    // Check if this is a Database API call (starts with /hmm/v1)
+    const isDatabaseApiCall = endpoint.startsWith('/hmm/v1');
+    
+    // For Database API calls, use the direct endpoint without the 'custom/v1' prefix
+    const url = isDatabaseApiCall 
+      ? `${API_BASE_URL}${endpoint}`
+      : `${API_BASE_URL}/custom/v1${endpoint}`;
+      
+    console.info(`Fetching ${isDatabaseApiCall ? 'Database' : 'Custom'} API: ${endpoint}`, url);
     
     const response = await fetch(url, fetchOptions);
     
@@ -113,10 +120,10 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     }
     
     const data = await response.json();
-    console.info('Custom API response data:', data);
+    console.info(`${isDatabaseApiCall ? 'Database' : 'Custom'} API response data:`, data);
     return data;
   } catch (error) {
-    console.error(`Error fetching from custom API (${endpoint}):`, error);
+    console.error(`Error fetching from ${endpoint.startsWith('/hmm/v1') ? 'Database' : 'Custom'} API (${endpoint}):`, error);
     // Don't show toast for GET requests to avoid flooding the UI
     if (!options.suppressToast && options.method && options.method !== 'GET') {
       toast.error(`Lỗi API: ${error instanceof Error ? error.message : 'Không thể kết nối tới máy chủ'}`);

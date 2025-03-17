@@ -21,7 +21,10 @@ export default function DatabaseApiInfo() {
       try {
         const data = await fetchCustomAPI('/hmm/v1/tables', { suppressToast: true });
         if (data && Array.isArray(data.tables)) {
-          setTables(data.tables);
+          setTables(data.tables.map(table => ({
+            table_name: table.name,
+            row_count: table.rows
+          })));
         } else {
           setTables([]);
         }

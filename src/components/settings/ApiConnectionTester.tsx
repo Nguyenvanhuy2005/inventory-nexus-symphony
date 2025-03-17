@@ -18,9 +18,9 @@ const ApiEndpoints = {
     { name: "Customers", path: "/customers" }
   ],
   databaseApi: [
-    { name: "API Status", path: "/status" },
-    { name: "Tables List", path: "/tables" },
-    { name: "Suppliers", path: "/tables/wp_hmm_suppliers" }
+    { name: "API Status", path: "/hmm/v1/status" },
+    { name: "Tables List", path: "/hmm/v1/tables" },
+    { name: "Suppliers", path: "/hmm/v1/tables/wp_hmm_suppliers" }
   ]
 };
 
@@ -78,7 +78,7 @@ export default function ApiConnectionTester() {
       // Test Database API endpoints
       for (const endpoint of ApiEndpoints.databaseApi) {
         try {
-          await fetchCustomAPI(`/hmm/v1${endpoint.path}`, { suppressToast: true });
+          await fetchCustomAPI(endpoint.path, { suppressToast: true });
           databaseApiResults.push({
             success: true,
             message: `${endpoint.name}: Kết nối thành công`
