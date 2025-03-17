@@ -17,8 +17,8 @@ export const DEFAULT_WORDPRESS_CREDENTIALS = {
   application_password: 'ISJu eeS5 CMg5 fh64 jtaW 76ng'
 };
 
-// Add fetchWordPress import
-import { fetchWordPress } from './api-utils';
+// Add fetchWordPress and fetchCustomAPI imports
+import { fetchWordPress, fetchCustomAPI } from './api-utils';
 
 /**
  * Checks if WooCommerce API credentials are valid
@@ -40,11 +40,46 @@ export async function checkWooCommerceAuth(): Promise<boolean> {
 }
 
 /**
+ * Checks if Database API credentials are valid
+ */
+export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean, error: string | null}> {
+  try {
+    // Try to fetch the status endpoint to check authentication
+    await fetchCustomAPI('/hmm/v1/status', { suppressToast: true });
+    return {
+      isAuthenticated: true,
+      error: null
+    };
+  } catch (error) {
+    console.error('Database API authentication failed:', error);
+    let errorMessage = 'Database API authentication failed';
+    
+    if (error instanceof Error) {
+      if (error.message.includes('401')) {
+        errorMessage = 'Lỗi xác thực (401): Thông tin xác thực không hợp lệ';
+      } else if (error.message.includes('404')) {
+        errorMessage = 'Lỗi 404: Endpoint không tồn tại, kiểm tra plugin HMM Database API';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    return {
+      isAuthenticated: false,
+      error: errorMessage
+    };
+  }
+}
+
+/**
  * Gets authentication status for various APIs
  */
 export async function getAuthStatus() {
   initializeDefaultCredentials();
+  
   const wooCommerceAuth = await checkWooCommerceAuth();
+  const databaseApiAuth = await checkDatabaseApiAuth();
+  
   let wpConnected = false;
   try {
     await fetchWordPress('/users', { suppressToast: true });
@@ -57,6 +92,10 @@ export async function getAuthStatus() {
     woocommerce: {
       isAuthenticated: wooCommerceAuth,
       hasCredentials: !!localStorage.getItem('woocommerce_consumer_key') && !!localStorage.getItem('woocommerce_consumer_secret')
+    },
+    databaseApi: {
+      isAuthenticated: databaseApiAuth.isAuthenticated,
+      error: databaseApiAuth.error
     },
     status: {
       wordpress: {
@@ -93,4 +132,18 @@ export function initializeDefaultCredentials() {
     woo_key: localStorage.getItem('woocommerce_consumer_key'),
     woo_secret: localStorage.getItem('woocommerce_consumer_secret')?.substring(0, 5) + '...'
   });
+}
+
+/**
+ * Check if all APIs are connected and authenticated
+ */
+export function isFullyConnected(): boolean {
+  // This is a synchronous check just based on localStorage
+  const hasWooCredentials = !!localStorage.getItem('woocommerce_consumer_key') && 
+                          !!localStorage.getItem('woocommerce_consumer_secret');
+  
+  const hasWpCredentials = !!localStorage.getItem('wordpress_username') && 
+                          !!localStorage.getItem('wordpress_application_password');
+  
+  return hasWooCredentials && hasWpCredentials;
 }

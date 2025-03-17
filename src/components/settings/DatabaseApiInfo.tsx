@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect } from "react";
@@ -84,7 +83,7 @@ export default function DatabaseApiInfo() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>HMM Database API</CardTitle>
-        <Badge variant={authStatus.status === 'success' ? 'success' : 'destructive'}>
+        <Badge variant={authStatus.status === 'success' ? 'default' : 'destructive'}>
           {authStatus.status === 'success' ? 'Đã xác thực' : 'Chưa xác thực'}
         </Badge>
       </CardHeader>

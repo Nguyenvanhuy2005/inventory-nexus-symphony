@@ -1,28 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { checkAPIStatus } from "@/lib/api-utils";
-import { checkWooCommerceAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
+import { checkWooCommerceAuth, checkDatabaseApiAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
 import { toast } from "sonner";
 import { PaymentReceipt, Product, ProductVariation, StockTransaction, Supplier } from "@/types/models";
 import { mockSuppliers } from "@/lib/mock-data-suppliers";
 import { mockPaymentReceipts } from "@/lib/mock-data-payment-receipts";
-
-// Define types for the return values of our query hooks
-type ApiStatus = {
-  isConnected: boolean;
-  version?: string;
-  error?: string | null;
-  status?: string;
-  woocommerce: {
-    isAuthenticated: boolean;
-    error: string | null;
-  }
-};
-
-type ProductWithVariations = {
-  product: Product | null;
-  variations: ProductVariation[];
-};
 
 /**
  * Hook to check API connection status
@@ -37,12 +20,18 @@ export function useCheckAPIStatus() {
       
       const apiStatus = await checkAPIStatus();
       const woocommerceStatus = await checkWooCommerceAuth();
+      const databaseApiStatus = await checkDatabaseApiAuth();
       
       return {
         ...apiStatus,
         woocommerce: {
           isAuthenticated: woocommerceStatus,
-          error: woocommerceStatus ? null : 'Không thể xác thực với WooCommerce API'
+          error: woocommerceStatus ? null : 'Không thể xác thực với WooCommerce API',
+          hasCredentials: !!localStorage.getItem('woocommerce_consumer_key') && !!localStorage.getItem('woocommerce_consumer_secret')
+        },
+        databaseApi: {
+          isAuthenticated: databaseApiStatus.isAuthenticated,
+          error: databaseApiStatus.error
         },
         status: apiStatus.status || {
           wordpress: {

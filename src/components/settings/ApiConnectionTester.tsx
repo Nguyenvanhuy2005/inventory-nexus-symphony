@@ -89,7 +89,19 @@ export default function ApiConnectionTester() {
             message: `${endpoint.name}: Kết nối thành công`
           });
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : "Lỗi kết nối";
+          let errorMessage = "Lỗi kết nối";
+          
+          if (error instanceof Error) {
+            // Enhance error messages for common issues
+            if (error.message.includes('401')) {
+              errorMessage = "Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ";
+            } else if (error.message.includes('404')) {
+              errorMessage = "Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt";
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           databaseApiResults.push({
             success: false,
             message: `${endpoint.name}: Kết nối thất bại`,

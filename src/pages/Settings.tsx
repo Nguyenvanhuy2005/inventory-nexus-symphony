@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -107,6 +106,7 @@ export default function Settings() {
   const isWordPressConnected = apiStatus.data?.status?.wordpress?.connected || false;                  
   const wordpressStatus = apiStatus.data?.status?.wordpress?.message || "Unknown status";
   const isWooCommerceAuthenticated = apiStatus.data?.woocommerce?.isAuthenticated || false;
+  const isDatabaseApiAuthenticated = apiStatus.data?.databaseApi?.isAuthenticated || false;
   
   return (
     <div className="space-y-6">
@@ -167,6 +167,31 @@ export default function Settings() {
                   <CheckCircle className="h-5 w-5 text-green-500" />
                 ) : (
                   <CircleSlash className="h-5 w-5 text-yellow-500" />
+                )}
+              </div>
+              
+              <Separator />
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>HMM Database API</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Trạng thái kết nối đến HMM Database API.
+                  </p>
+                </div>
+                {apiStatus.isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : apiStatus.isError ? (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                ) : isDatabaseApiAuthenticated ? (
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                ) : (
+                  <CircleSlash className="h-5 w-5 text-yellow-500" />
+                )}
+                {apiStatus.data?.databaseApi?.error && !isDatabaseApiAuthenticated && (
+                  <div className="text-xs text-red-500 mt-1">
+                    {apiStatus.data.databaseApi.error}
+                  </div>
                 )}
               </div>
               
