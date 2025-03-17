@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { fetchWooCommerce, fetchWordPress } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api-utils";
 
 const ApiEndpoints = {
   wordpress: [
@@ -16,6 +16,11 @@ const ApiEndpoints = {
     { name: "Products", path: "/products" },
     { name: "Orders", path: "/orders" },
     { name: "Customers", path: "/customers" }
+  ],
+  databaseApi: [
+    { name: "API Status", path: "/status" },
+    { name: "Tables List", path: "/tables" },
+    { name: "Suppliers", path: "/tables/wp_hmm_suppliers" }
   ]
 };
 
@@ -24,15 +29,18 @@ export default function ApiConnectionTester() {
   const [results, setResults] = useState<{
     wordpress: { success: boolean; message: string }[];
     woocommerce: { success: boolean; message: string }[];
+    databaseApi: { success: boolean; message: string }[];
   }>({
     wordpress: [],
-    woocommerce: []
+    woocommerce: [],
+    databaseApi: []
   });
 
   const testApiConnections = async () => {
     setTesting(true);
     const wordpressResults = [];
     const woocommerceResults = [];
+    const databaseApiResults = [];
 
     try {
       // Test WordPress endpoints
@@ -67,9 +75,26 @@ export default function ApiConnectionTester() {
         }
       }
 
+      // Test Database API endpoints
+      for (const endpoint of ApiEndpoints.databaseApi) {
+        try {
+          await fetchCustomAPI(`/hmm/v1${endpoint.path}`, { suppressToast: true });
+          databaseApiResults.push({
+            success: true,
+            message: `${endpoint.name}: Kết nối thành công`
+          });
+        } catch (error) {
+          databaseApiResults.push({
+            success: false,
+            message: `${endpoint.name}: ${error instanceof Error ? error.message : "Lỗi kết nối"}`
+          });
+        }
+      }
+
       setResults({
         wordpress: wordpressResults,
-        woocommerce: woocommerceResults
+        woocommerce: woocommerceResults,
+        databaseApi: databaseApiResults
       });
 
       toast.success("Đã hoàn thành kiểm tra kết nối API");
@@ -111,6 +136,24 @@ export default function ApiConnectionTester() {
             <ul className="space-y-2">
               {results.woocommerce.map((result, index) => (
                 <li key={`woo-${index}`} className="flex items-center gap-2">
+                  {result.success ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  )}
+                  <span>{result.message}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {results.databaseApi.length > 0 && (
+          <div>
+            <h3 className="text-lg font-medium mb-2">HMM Database API</h3>
+            <ul className="space-y-2">
+              {results.databaseApi.map((result, index) => (
+                <li key={`db-${index}`} className="flex items-center gap-2">
                   {result.success ? (
                     <CheckCircle className="h-5 w-5 text-green-500" />
                   ) : (
