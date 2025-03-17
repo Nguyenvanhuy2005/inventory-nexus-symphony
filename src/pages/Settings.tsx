@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -100,11 +99,8 @@ export default function Settings() {
     toast({ description: "Đã sao chép Mật khẩu ứng dụng vào clipboard." });
   };
 
-  // Safely check for nested properties with null checks
-  const isConnected = apiStatus.data?.status?.wordpress?.connected || false;
-                      
+  const isWordPressConnected = apiStatus.data?.status?.wordpress?.connected || false;                  
   const wordpressStatus = apiStatus.data?.status?.wordpress?.message || "Unknown status";
-
   const isWooCommerceAuthenticated = apiStatus.data?.woocommerce?.isAuthenticated || false;
   
   return (
@@ -113,102 +109,6 @@ export default function Settings() {
         title="Cài đặt"
         description="Quản lý cài đặt và cấu hình hệ thống."
       />
-      
-      <Card className="space-y-4">
-        <CardHeader>
-          <CardTitle>Kết nối WooCommerce API</CardTitle>
-          <CardDescription>
-            Nhập thông tin xác thực API WooCommerce để đồng bộ dữ liệu.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="consumerKey">WooCommerce Consumer Key</Label>
-            <div className="relative">
-              <Input 
-                id="consumerKey" 
-                value={wooConsumerKey} 
-                onChange={(e) => setWooConsumerKey(e.target.value)} 
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="absolute right-2 top-1/2 -translate-y-1/2"
-                onClick={handleCopyKey}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="consumerSecret">WooCommerce Consumer Secret</Label>
-            <div className="relative">
-              <Input 
-                id="consumerSecret" 
-                type="password"
-                value={wooConsumerSecret} 
-                onChange={(e) => setWooConsumerSecret(e.target.value)} 
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="absolute right-2 top-1/2 -translate-y-1/2"
-                onClick={handleCopySecret}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card className="space-y-4">
-        <CardHeader>
-          <CardTitle>Kết nối WordPress API</CardTitle>
-          <CardDescription>
-            Nhập thông tin xác thực WordPress API để đồng bộ dữ liệu.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="wpUsername">WordPress Username</Label>
-            <div className="relative">
-              <Input 
-                id="wpUsername" 
-                value={wpUsername} 
-                onChange={(e) => setWpUsername(e.target.value)} 
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="absolute right-2 top-1/2 -translate-y-1/2"
-                onClick={handleCopyUsername}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="wpPassword">WordPress Application Password</Label>
-            <div className="relative">
-              <Input 
-                id="wpPassword" 
-                type="password"
-                value={wpPassword} 
-                onChange={(e) => setWpPassword(e.target.value)} 
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="absolute right-2 top-1/2 -translate-y-1/2"
-                onClick={handleCopyPassword}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
       
       <Card className="space-y-4">
         <CardHeader>
@@ -249,7 +149,7 @@ export default function Settings() {
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : apiStatus.isError ? (
               <XCircle className="h-5 w-5 text-red-500" />
-            ) : isConnected ? (
+            ) : isWordPressConnected ? (
               <CheckCircle className="h-5 w-5 text-green-500" />
             ) : (
               <CircleSlash className="h-5 w-5 text-yellow-500" />
@@ -265,6 +165,114 @@ export default function Settings() {
               <p>{String(apiStatus.error)}</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+      
+      <Card className="space-y-4">
+        <CardHeader>
+          <CardTitle>Kết nối WooCommerce API</CardTitle>
+          <CardDescription>
+            Nhập thông tin xác thực API WooCommerce để đồng bộ dữ liệu.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="consumerKey">WooCommerce Consumer Key</Label>
+            <div className="relative">
+              <Input 
+                id="consumerKey" 
+                value={wooConsumerKey} 
+                onChange={(e) => setWooConsumerKey(e.target.value)} 
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => {
+                  navigator.clipboard.writeText(wooConsumerKey);
+                  toast({ description: "Đã sao chép Consumer Key vào clipboard." });
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="consumerSecret">WooCommerce Consumer Secret</Label>
+            <div className="relative">
+              <Input 
+                id="consumerSecret" 
+                type="password"
+                value={wooConsumerSecret} 
+                onChange={(e) => setWooConsumerSecret(e.target.value)} 
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => {
+                  navigator.clipboard.writeText(wooConsumerSecret);
+                  toast({ description: "Đã sao chép Consumer Secret vào clipboard." });
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card className="space-y-4">
+        <CardHeader>
+          <CardTitle>Kết nối WordPress API</CardTitle>
+          <CardDescription>
+            Nhập thông tin xác thực WordPress API để đồng bộ dữ liệu.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="wpUsername">WordPress Username</Label>
+            <div className="relative">
+              <Input 
+                id="wpUsername" 
+                value={wpUsername} 
+                onChange={(e) => setWpUsername(e.target.value)} 
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => {
+                  navigator.clipboard.writeText(wpUsername);
+                  toast({ description: "Đã sao chép Tên người dùng vào clipboard." });
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="wpPassword">WordPress Application Password</Label>
+            <div className="relative">
+              <Input 
+                id="wpPassword" 
+                type="password"
+                value={wpPassword} 
+                onChange={(e) => setWpPassword(e.target.value)} 
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => {
+                  navigator.clipboard.writeText(wpPassword);
+                  toast({ description: "Đã sao chép Mật khẩu ứng dụng vào clipboard." });
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
       

@@ -17,6 +17,9 @@ export const DEFAULT_WORDPRESS_CREDENTIALS = {
   application_password: '2Otq 0hzZ 33Ya 5Hpi ntGS Dkog'
 };
 
+// Add fetchWordPress import
+import { fetchWordPress } from './api-utils';
+
 /**
  * Checks if WooCommerce API credentials are valid
  */
@@ -44,7 +47,7 @@ export async function getAuthStatus() {
   const wooCommerceAuth = await checkWooCommerceAuth();
   let wpConnected = false;
   try {
-    await fetchWordPress('/wp/v2/users', { suppressToast: true });
+    await fetchWordPress('/users', { suppressToast: true });
     wpConnected = true;
   } catch (error) {
     console.error('WordPress API check failed:', error);
