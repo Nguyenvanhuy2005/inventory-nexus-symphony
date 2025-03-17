@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,7 +60,6 @@ export default function ProductSelectAutoComplete({
     
     setLoading(true);
     try {
-      // Fetch products from WooCommerce
       const wooProducts = await fetchWooCommerce(`/products?search=${encodeURIComponent(query)}&per_page=10`, {
         suppressToast: true
       });
@@ -78,7 +76,6 @@ export default function ProductSelectAutoComplete({
           image: product.images?.[0]?.src
         }));
         
-        // If real stock is required, fetch it from custom API
         if (includeRealStock && productsData.length > 0) {
           try {
             const productIds = productsData.map(p => p.id);
@@ -87,7 +84,6 @@ export default function ProductSelectAutoComplete({
             });
             
             if (Array.isArray(stockLevels)) {
-              // Merge real stock data with products
               productsData = productsData.map(product => {
                 const stockData = stockLevels.find(sl => sl.product_id === product.id);
                 return {
@@ -106,7 +102,6 @@ export default function ProductSelectAutoComplete({
       }
     } catch (error) {
       console.error("Error searching products:", error);
-      // Use mock data if API fails
       setProducts([
         { id: 1, name: "Sản phẩm mẫu 1", sku: "SP001", price: "100000", real_stock: 10, available_to_sell: 8 },
         { id: 2, name: "Sản phẩm mẫu 2", sku: "SP002", price: "200000", real_stock: 5, available_to_sell: 5 },

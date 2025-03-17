@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { initializeDefaultCredentials } from "./auth-utils";
+import { initializeDefaultCredentials, DEFAULT_WORDPRESS_CREDENTIALS } from "./auth-utils";
 
 // Initialize credentials on module load
 initializeDefaultCredentials();

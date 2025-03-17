@@ -35,7 +35,7 @@ export default function CreateReturnForm({ onSuccess }: CreateReturnFormProps) {
     setSelectedProduct(product);
     setSelectedVariation(null);
     
-    // Set default supplier info if available
+    // Set default supplier info if available - using optional chaining to safely access meta_data
     if (product.meta_data) {
       const supplierIdMeta = product.meta_data.find(meta => meta.key === '_supplier_id');
       const supplierNameMeta = product.meta_data.find(meta => meta.key === '_supplier_name');

@@ -35,12 +35,15 @@ export interface Product {
   manage_stock?: boolean;
   featured?: boolean;
   images?: Array<{ id: number; src: string; name: string }>;
+  image?: string;
   type?: 'simple' | 'variable' | 'grouped' | 'external';
   real_stock?: number;
   available_to_sell?: number;
   pending_orders?: number;
   attributes?: any[];
   variation_id?: number;
+  variations?: number[];
+  meta_data?: Array<{ key: string; value: any }>;
 }
 
 export interface ProductVariation {
@@ -150,7 +153,7 @@ export interface StockTransaction {
   previous_quantity: number;
   current_quantity: number;
   type: 'goods_receipt' | 'return' | 'sale' | 'adjustment' | 'damaged';
-  transaction_type?: string; // added for compatibility with existing code
+  transaction_type?: string;
   reference_id: string;
   reference_type: 'goods_receipt' | 'return' | 'order' | 'adjustment' | 'damaged';
   notes?: string;
