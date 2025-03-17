@@ -1,11 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { checkAPIStatus } from "@/lib/api-utils";
-import { checkWooCommerceAuth, checkDatabaseApiAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
-import { fetchWooCommerce, fetchCustomAPI, fetchDatabaseTable, executeDatabaseQuery } from "@/lib/api-utils";
 import { toast } from "sonner";
 import { PaymentReceipt, Product, ProductVariation, ProductWithVariations, StockTransaction, Supplier } from "@/types/models";
 import { mockSuppliers } from "@/lib/mock-data-suppliers";
 import { mockPaymentReceipts } from "@/lib/mock-data-payment-receipts";
+import { 
+  checkAPIStatus, 
+  fetchWooCommerce, 
+  fetchCustomAPI, 
+  fetchDatabaseTable, 
+  executeDatabaseQuery 
+} from "@/lib/api";
+import { 
+  checkWooCommerceAuth, 
+  checkDatabaseApiAuth, 
+  initializeDefaultCredentials 
+} from "@/lib/auth-utils";
 
 /**
  * Hook to check API connection status

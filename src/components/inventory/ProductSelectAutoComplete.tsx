@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { Product as ModelProduct } from "@/types/models";
 

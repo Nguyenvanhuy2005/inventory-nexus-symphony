@@ -1,5 +1,4 @@
-
-import { fetchWooCommerce } from './api-utils';
+import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from './api';
 
 /**
  * Default WooCommerce credentials - These will be used if not overridden by localStorage
@@ -16,9 +15,6 @@ export const DEFAULT_WORDPRESS_CREDENTIALS = {
   username: 'admin',
   application_password: 'ISJu eeS5 CMg5 fh64 jtaW 76ng'
 };
-
-// Add fetchWordPress and fetchCustomAPI imports
-import { fetchWordPress, fetchCustomAPI } from './api-utils';
 
 /**
  * Checks if WooCommerce API credentials are valid

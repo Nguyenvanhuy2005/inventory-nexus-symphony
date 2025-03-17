@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ApiEndpoints = {
