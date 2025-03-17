@@ -2,129 +2,201 @@
 /**
  * Plugin Name: HMM Database API
  * Description: API để kết nối cơ sở dữ liệu WordPress với ứng dụng HMM Inventory
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: HMM
  */
 
 // Ngăn chặn truy cập trực tiếp
 if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly
+    exit;
 }
 
 class HMM_Database_API {
+    private static $instance = null;
+    
+    /**
+     * Singleton pattern - chỉ cho phép một instance của plugin
+     */
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
     /**
      * Constructor
      */
-    public function __construct() {
+    private function __construct() {
         // Khởi tạo REST API
         add_action('rest_api_init', array($this, 'register_api_routes'));
         
         // Tạo bảng khi kích hoạt plugin
         register_activation_hook(__FILE__, array($this, 'create_custom_tables'));
         
-        // Cho phép CORS trong development
+        // Thêm menu admin
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        
+        // Cho phép CORS và OPTIONS requests
         add_action('rest_api_init', function() {
             remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
             add_filter('rest_pre_serve_request', function($value) {
                 header('Access-Control-Allow-Origin: *');
-                header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+                header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
                 header('Access-Control-Allow-Credentials: true');
-                header('Access-Control-Expose-Headers: Link', false);
+                header('Access-Control-Allow-Headers: Authorization, Content-Type');
+                
+                // Handle OPTIONS request
+                if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                    status_header(200);
+                    exit();
+                }
+                
                 return $value;
             });
         }, 15);
     }
-    
+
     /**
      * Đăng ký các API endpoints
      */
     public function register_api_routes() {
-        // API endpoint để kiểm tra trạng thái
-        register_rest_route('hmm/v1', '/status', array(
+        // Base API route
+        $base = 'hmm/v1';
+        
+        // Status endpoint
+        register_rest_route($base, '/status', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_status'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
-        // API endpoint để lấy thông tin tất cả bảng
-        register_rest_route('hmm/v1', '/tables', array(
-            'methods' => 'GET',
-            'callback' => array($this, 'get_all_tables'),
-            'permission_callback' => array($this, 'api_permissions_check'),
+        // Tables endpoints
+        register_rest_route($base, '/tables', array(
+            array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_all_tables'),
+                'permission_callback' => array($this, 'api_permissions_check'),
+            ),
+            array(
+                'methods' => 'POST',
+                'callback' => array($this, 'create_table'),
+                'permission_callback' => array($this, 'api_permissions_check'),
+            )
         ));
         
-        // API endpoint để lấy cấu trúc bảng
-        register_rest_route('hmm/v1', '/tables/(?P<table_name>[a-zA-Z0-9_-]+)', array(
+        // Table structure endpoint
+        register_rest_route($base, '/tables/(?P<table_name>[a-zA-Z0-9_-]+)', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_table_structure'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
-        // API endpoint để lấy dữ liệu từ bảng
-        register_rest_route('hmm/v1', '/query', array(
+        // Query endpoint
+        register_rest_route($base, '/query', array(
             'methods' => 'POST',
             'callback' => array($this, 'execute_query'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
-        // API endpoint để tạo bảng mới
-        register_rest_route('hmm/v1', '/tables', array(
+        // Table data endpoints
+        register_rest_route($base, '/data/(?P<table>[a-zA-Z0-9_-]+)', array(
+            array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_table_data'),
+                'permission_callback' => array($this, 'api_permissions_check'),
+            ),
+            array(
+                'methods' => 'POST',
+                'callback' => array($this, 'insert_table_data'),
+                'permission_callback' => array($this, 'api_permissions_check'),
+            )
+        ));
+        
+        register_rest_route($base, '/data/(?P<table>[a-zA-Z0-9_-]+)/(?P<id>\d+)', array(
+            array(
+                'methods' => 'PUT',
+                'callback' => array($this, 'update_table_data'),
+                'permission_callback' => array($this, 'api_permissions_check'),
+            ),
+            array(
+                'methods' => 'DELETE',
+                'callback' => array($this, 'delete_table_data'),
+                'permission_callback' => array($this, 'api_permissions_check'),
+            )
+        ));
+        
+        // Compatibility endpoints for custom-api
+        register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/insert', array(
             'methods' => 'POST',
-            'callback' => array($this, 'create_table'),
+            'callback' => array($this, 'insert_table_data'),
+            'permission_callback' => array($this, 'api_permissions_check'),
+        ));
+        
+        register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/update/(?P<id>\d+)', array(
+            'methods' => 'PUT',
+            'callback' => array($this, 'update_table_data'),
+            'permission_callback' => array($this, 'api_permissions_check'),
+        ));
+        
+        register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/delete/(?P<id>\d+)', array(
+            'methods' => 'DELETE',
+            'callback' => array($this, 'delete_table_data'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
     }
-    
+
     /**
      * Kiểm tra quyền truy cập API
-     * Đã sửa để hỗ trợ cả Application Passwords và quyền quản trị
      */
     public function api_permissions_check($request) {
-        // Nếu người dùng đã đăng nhập, kiểm tra quyền
+        // Allow OPTIONS requests
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            return true;
+        }
+        
+        // Check if user is logged in with admin rights
         if (current_user_can('manage_options')) {
             return true;
         }
         
-        // Kiểm tra xác thực bằng Application Password
+        // Check Application Password authentication
         $auth_header = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : false;
         
         if (!$auth_header) {
             return false;
         }
 
-        // Lấy thông tin xác thực từ header
         if (preg_match('/Basic\s+(.*)$/i', $auth_header, $matches)) {
             $auth_data = base64_decode($matches[1]);
             list($username, $password) = explode(':', $auth_data, 2);
             
-            // Lấy user ID từ tên người dùng
             $user = get_user_by('login', $username);
             
             if (!$user) {
                 return false;
             }
             
-            // Kiểm tra nếu đây là Application Password
+            // Check normal password
             if (wp_check_password($password, $user->user_pass)) {
-                // Mật khẩu cơ bản hợp lệ
                 return user_can($user, 'manage_options');
-            } else {
-                // Kiểm tra Application Password
-                require_once ABSPATH . 'wp-includes/class-wp-application-passwords.php';
-                $application_passwords = new WP_Application_Passwords();
-                
-                if (method_exists($application_passwords, 'validate_application_password')) {
-                    $result = $application_passwords->validate_application_password($user->user_login, $password);
-                    if (!is_wp_error($result)) {
-                        return user_can($user, 'manage_options');
-                    }
+            }
+            
+            // Check Application Password
+            require_once ABSPATH . 'wp-includes/class-wp-application-passwords.php';
+            $application_passwords = new WP_Application_Passwords();
+            
+            if (method_exists($application_passwords, 'validate_application_password')) {
+                $result = $application_passwords->validate_application_password($user->user_login, $password);
+                if (!is_wp_error($result)) {
+                    return user_can($user, 'manage_options');
                 }
             }
         }
         
         return false;
     }
-    
+
     /**
      * Trả về trạng thái API
      */
@@ -132,527 +204,351 @@ class HMM_Database_API {
         global $wpdb;
         
         $tables = $this->get_custom_tables();
+        $write_support = true; // Indicate write support is enabled
         
         return array(
             'status' => 'active',
-            'version' => '1.0.1',
+            'version' => '1.0.2',
             'wordpress_version' => get_bloginfo('version'),
             'database_prefix' => $wpdb->prefix,
             'custom_tables' => $tables,
+            'write_support' => $write_support,
             'timestamp' => current_time('mysql')
         );
     }
-    
-    /**
-     * Tạo các bảng tùy chỉnh khi kích hoạt plugin
-     */
-    public function create_custom_tables() {
-        global $wpdb;
-        
-        $charset_collate = $wpdb->get_charset_collate();
-        
-        // Bảng lưu trữ tồn kho
-        $table_stock_levels = $wpdb->prefix . 'hmm_stock_levels';
-        $sql = "CREATE TABLE IF NOT EXISTS $table_stock_levels (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            product_id bigint(20) NOT NULL,
-            ton_thuc_te int(11) DEFAULT 0,
-            co_the_ban int(11) DEFAULT 0,
-            last_updated datetime DEFAULT CURRENT_TIMESTAMP,
-            notes text,
-            PRIMARY KEY  (id),
-            UNIQUE KEY product_id (product_id)
-        ) $charset_collate;";
-        
-        // Bảng ghi nhận giao dịch tồn kho
-        $table_stock_transactions = $wpdb->prefix . 'hmm_stock_transactions';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_stock_transactions (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            transaction_id varchar(32) NOT NULL,
-            product_id bigint(20) NOT NULL,
-            product_name varchar(255) NOT NULL,
-            variation_id bigint(20) DEFAULT NULL,
-            quantity int(11) NOT NULL,
-            previous_quantity int(11) NOT NULL,
-            current_quantity int(11) NOT NULL,
-            type varchar(50) NOT NULL,
-            transaction_type varchar(50) NOT NULL,
-            reference_id varchar(50) DEFAULT NULL,
-            reference_type varchar(50) DEFAULT NULL,
-            notes text,
-            created_by varchar(50) NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            KEY product_id (product_id),
-            KEY transaction_type (transaction_type),
-            KEY reference_id (reference_id)
-        ) $charset_collate;";
-        
-        // Bảng nhà cung cấp
-        $table_suppliers = $wpdb->prefix . 'hmm_suppliers';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_suppliers (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            name varchar(255) NOT NULL,
-            email varchar(100) DEFAULT NULL,
-            phone varchar(20) DEFAULT NULL,
-            address text,
-            contact_name varchar(100) DEFAULT NULL,
-            notes text,
-            payment_terms varchar(100) DEFAULT NULL,
-            tax_id varchar(50) DEFAULT NULL,
-            status varchar(20) DEFAULT 'active',
-            initial_debt decimal(15,2) DEFAULT 0.00,
-            current_debt decimal(15,2) DEFAULT 0.00,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id)
-        ) $charset_collate;";
-        
-        // Tạo bảng phiếu nhập hàng
-        $table_goods_receipts = $wpdb->prefix . 'hmm_goods_receipts';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_goods_receipts (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            receipt_id varchar(32) NOT NULL,
-            supplier_id bigint(20) NOT NULL,
-            supplier_name varchar(255) NOT NULL,
-            date datetime NOT NULL,
-            total_amount decimal(15,2) NOT NULL DEFAULT 0.00,
-            payment_amount decimal(15,2) NOT NULL DEFAULT 0.00,
-            payment_method varchar(20) DEFAULT NULL,
-            payment_status varchar(20) DEFAULT 'pending',
-            status varchar(20) DEFAULT 'pending',
-            notes text,
-            created_by varchar(50) NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY receipt_id (receipt_id),
-            KEY supplier_id (supplier_id)
-        ) $charset_collate;";
-        
-        // Bảng chi tiết phiếu nhập hàng
-        $table_goods_receipt_items = $wpdb->prefix . 'hmm_goods_receipt_items';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_goods_receipt_items (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            receipt_id varchar(32) NOT NULL,
-            product_id bigint(20) NOT NULL,
-            product_name varchar(255) NOT NULL,
-            variation_id bigint(20) DEFAULT NULL,
-            sku varchar(100) DEFAULT NULL,
-            quantity int(11) NOT NULL DEFAULT 0,
-            unit_price decimal(15,2) NOT NULL DEFAULT 0.00,
-            total_price decimal(15,2) NOT NULL DEFAULT 0.00,
-            notes text,
-            PRIMARY KEY (id),
-            KEY receipt_id (receipt_id),
-            KEY product_id (product_id)
-        ) $charset_collate;";
-        
-        // Bảng phiếu trả hàng
-        $table_returns = $wpdb->prefix . 'hmm_returns';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_returns (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            return_id varchar(32) NOT NULL,
-            type varchar(20) NOT NULL DEFAULT 'supplier',
-            entity_id bigint(20) NOT NULL,
-            entity_name varchar(255) NOT NULL,
-            date datetime NOT NULL,
-            reason text NOT NULL,
-            total_amount decimal(15,2) NOT NULL DEFAULT 0.00,
-            payment_amount decimal(15,2) NOT NULL DEFAULT 0.00,
-            payment_status varchar(20) DEFAULT 'not_refunded',
-            status varchar(20) DEFAULT 'pending',
-            notes text,
-            created_by varchar(50) NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY return_id (return_id),
-            KEY entity_id (entity_id)
-        ) $charset_collate;";
-        
-        // Bảng chi tiết phiếu trả hàng
-        $table_return_items = $wpdb->prefix . 'hmm_return_items';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_return_items (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            return_id varchar(32) NOT NULL,
-            product_id bigint(20) NOT NULL,
-            product_name varchar(255) NOT NULL,
-            variation_id bigint(20) DEFAULT NULL,
-            sku varchar(100) DEFAULT NULL,
-            quantity int(11) NOT NULL DEFAULT 0,
-            unit_price decimal(15,2) NOT NULL DEFAULT 0.00,
-            total_price decimal(15,2) NOT NULL DEFAULT 0.00,
-            reason text,
-            PRIMARY KEY (id),
-            KEY return_id (return_id),
-            KEY product_id (product_id)
-        ) $charset_collate;";
-        
-        // Bảng phiếu thu chi
-        $table_payment_receipts = $wpdb->prefix . 'hmm_payment_receipts';
-        $sql .= "CREATE TABLE IF NOT EXISTS $table_payment_receipts (
-            id bigint(20) NOT NULL AUTO_INCREMENT,
-            receipt_id varchar(32) NOT NULL,
-            type varchar(20) NOT NULL,
-            entity_type varchar(20) NOT NULL,
-            entity_id bigint(20) NOT NULL,
-            entity_name varchar(255) NOT NULL,
-            date datetime NOT NULL,
-            amount decimal(15,2) NOT NULL DEFAULT 0.00,
-            payment_method varchar(20) NOT NULL,
-            reference varchar(100) DEFAULT NULL,
-            reference_type varchar(20) DEFAULT NULL,
-            status varchar(20) DEFAULT 'completed',
-            description varchar(255) NOT NULL,
-            notes text,
-            attachment_url text,
-            created_by varchar(50) NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY receipt_id (receipt_id),
-            KEY entity_id (entity_id),
-            KEY entity_type (entity_type),
-            KEY type (type)
-        ) $charset_collate;";
+          // Khởi tạo plugin
+$hmm_database_api = new HMM_Database_API();
 
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
-        
-        // Lưu version của database để kiểm tra cập nhật sau này
-        add_option('hmm_database_version', '1.0.1');
-    }
-    
-    /**
-     * Lấy danh sách tất cả bảng trong database
-     */
-    public function get_all_tables() {
-        global $wpdb;
-        
-        // Lấy tất cả bảng trong database
-        $all_tables = $wpdb->get_results("SHOW TABLES", ARRAY_N);
-        $tables = array();
-        
-        foreach ($all_tables as $table) {
-            $table_name = $table[0];
-            $is_wp_table = strpos($table_name, $wpdb->prefix) === 0;
-            $is_hmm_table = strpos($table_name, $wpdb->prefix . 'hmm_') === 0;
-            
-            $tables[] = array(
-                'name' => $table_name,
-                'type' => $is_hmm_table ? 'hmm' : ($is_wp_table ? 'wordpress' : 'other'),
-                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM $table_name")
-            );
-        }
-        
-        return array(
-            'tables' => $tables,
-            'prefix' => $wpdb->prefix
-        );
-    }
-    
-    /**
-     * Lấy cấu trúc của một bảng cụ thể
-     */
-    public function get_table_structure($request) {
-        global $wpdb;
-        
-        $table_name = $request['table_name'];
-        
-        // Kiểm tra xem bảng có tồn tại không
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
-        if (!$table_exists) {
-            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
-        }
-        
-        // Lấy thông tin cột của bảng
-        $columns = $wpdb->get_results("DESCRIBE $table_name");
-        
-        // Lấy khóa ngoại nếu có
-        $foreign_keys = $wpdb->get_results("
-            SELECT
-                TABLE_NAME,
-                COLUMN_NAME,
-                CONSTRAINT_NAME,
-                REFERENCED_TABLE_NAME,
-                REFERENCED_COLUMN_NAME
-            FROM
-                INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-            WHERE
-                REFERENCED_TABLE_SCHEMA = DATABASE() AND
-                TABLE_NAME = '$table_name'
-        ");
-        
-        // Đếm số dòng dữ liệu
-        $row_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
-        
-        // Lấy mẫu dữ liệu
-        $sample_data = $wpdb->get_results("SELECT * FROM $table_name LIMIT 5");
-        
-        return array(
-            'table_name' => $table_name,
-            'columns' => $columns,
-            'foreign_keys' => $foreign_keys,
-            'row_count' => $row_count,
-            'sample_data' => $sample_data
-        );
-    }
-    
-    /**
-     * Thực thi một truy vấn SQL an toàn
-     */
-    public function execute_query($request) {
-        global $wpdb;
-        
-        $params = $request->get_json_params();
-        
-        if (!isset($params['query']) || empty($params['query'])) {
-            return new WP_Error('no_query', 'Không có truy vấn SQL', array('status' => 400));
-        }
-        
-        $query = $params['query'];
-        $query_type = strtoupper(substr(trim($query), 0, 6));
-        
-        // Chỉ cho phép SELECT để đảm bảo an toàn
-        if ($query_type !== 'SELECT') {
-            return new WP_Error('invalid_query', 'Chỉ hỗ trợ truy vấn SELECT', array('status' => 400));
-        }
-        
-        // Thực thi truy vấn
-        $results = $wpdb->get_results($query, ARRAY_A);
-        
-        if ($wpdb->last_error) {
-            return new WP_Error('query_error', $wpdb->last_error, array('status' => 400));
-        }
-        
-        return array(
-            'results' => $results,
-            'rows_affected' => $wpdb->num_rows,
-            'query' => $query
-        );
-    }
-    
-    /**
-     * Tạo bảng mới
-     */
-    public function create_table($request) {
-        global $wpdb;
-        
-        $params = $request->get_json_params();
-        
-        if (!isset($params['table_name']) || empty($params['table_name'])) {
-            return new WP_Error('no_table_name', 'Không có tên bảng', array('status' => 400));
-        }
-        
-        if (!isset($params['columns']) || empty($params['columns'])) {
-            return new WP_Error('no_columns', 'Không có thông tin cột', array('status' => 400));
-        }
-        
-        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($params['table_name']);
-        $charset_collate = $wpdb->get_charset_collate();
-        
-        // Tạo câu lệnh SQL tạo bảng
-        $sql = "CREATE TABLE IF NOT EXISTS $table_name (";
-        
-        foreach ($params['columns'] as $column) {
-            if (empty($column['name']) || empty($column['type'])) {
-                continue;
-            }
-            
-            $column_name = sanitize_key($column['name']);
-            $column_type = sanitize_text_field($column['type']);
-            
-            $sql .= "$column_name $column_type";
-            
-            if (isset($column['not_null']) && $column['not_null']) {
-                $sql .= " NOT NULL";
-            }
-            
-            if (isset($column['default'])) {
-                $default_value = sanitize_text_field($column['default']);
-                $sql .= " DEFAULT '$default_value'";
-            }
-            
-            if (isset($column['auto_increment']) && $column['auto_increment']) {
-                $sql .= " AUTO_INCREMENT";
-            }
-            
-            $sql .= ", ";
-        }
-        
-        // Thêm endpoints để thao tác với dữ liệu trong bảng
-        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)', array(
-            'methods' => 'GET',
-            'callback' => array($this, 'get_table_data'),
-            'permission_callback' => array($this, 'api_permissions_check'),
-        ));
-        
-        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)', array(
-            'methods' => 'POST',
-            'callback' => array($this, 'insert_table_data'),
-            'permission_callback' => array($this, 'api_permissions_check'),
-        ));
-        
-        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)/(?P<id>\d+)', array(
-            'methods' => 'PUT',
-            'callback' => array($this, 'update_table_data'),
-            'permission_callback' => array($this, 'api_permissions_check'),
-        ));
-        
-        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)/(?P<id>\d+)', array(
-            'methods' => 'DELETE',
-            'callback' => array($this, 'delete_table_data'),
-            'permission_callback' => array($this, 'api_permissions_check'),
-        ));
-    }
-    
-    /**
-     * Lấy dữ liệu từ bảng
-     */
-    public function get_table_data($request) {
-        global $wpdb;
-        
-        $table = $request['table'];
-        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
-        
-        // Kiểm tra bảng tồn tại
-        if (!$this->table_exists($table_name)) {
-            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
-        }
-        
-        // Thực hiện truy vấn
-        $results = $wpdb->get_results("SELECT * FROM $table_name", ARRAY_A);
-        
-        if ($wpdb->last_error) {
-            return new WP_Error('query_error', $wpdb->last_error, array('status' => 400));
-        }
-        
-        return array(
-            'data' => $results,
-            'total' => count($results)
-        );
-    }
-    
-    /**
-     * Thêm dữ liệu vào bảng
-     */
-    public function insert_table_data($request) {
-        global $wpdb;
-        
-        $table = $request['table'];
-        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
-        
-        // Kiểm tra bảng tồn tại
-        if (!$this->table_exists($table_name)) {
-            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
-        }
-        
-        $data = $request->get_json_params();
-        
-        // Thực hiện chèn dữ liệu
-        $result = $wpdb->insert($table_name, $data);
-        
-        if ($result === false) {
-            return new WP_Error('insert_error', $wpdb->last_error, array('status' => 400));
-        }
-        
-        return array(
-            'success' => true,
-            'id' => $wpdb->insert_id,
-            'message' => 'Đã thêm dữ liệu thành công'
-        );
-    }
-    
-    /**
-     * Cập nhật dữ liệu trong bảng
-     */
-    public function update_table_data($request) {
-        global $wpdb;
-        
-        $table = $request['table'];
-        $id = $request['id'];
-        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
-        
-        // Kiểm tra bảng tồn tại
-        if (!$this->table_exists($table_name)) {
-            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
-        }
-        
-        $data = $request->get_json_params();
-        
-        // Thực hiện cập nhật
-        $result = $wpdb->update(
-            $table_name,
-            $data,
-            array('id' => $id)
-        );
-        
-        if ($result === false) {
-            return new WP_Error('update_error', $wpdb->last_error, array('status' => 400));
-        }
-        
-        return array(
-            'success' => true,
-            'message' => 'Đã cập nhật dữ liệu thành công'
-        );
-    }
-    
-    /**
-     * Xóa dữ liệu khỏi bảng
-     */
-    public function delete_table_data($request) {
-        global $wpdb;
-        
-        $table = $request['table'];
-        $id = $request['id'];
-        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
-        
-        // Kiểm tra bảng tồn tại
-        if (!$this->table_exists($table_name)) {
-            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
-        }
-        
-        // Thực hiện xóa
-        $result = $wpdb->delete(
-            $table_name,
-            array('id' => $id)
-        );
-        
-        if ($result === false) {
-            return new WP_Error('delete_error', $wpdb->last_error, array('status' => 400));
-        }
-        
-        return array(
-            'success' => true,
-            'message' => 'Đã xóa dữ liệu thành công'
-        );
-    }
-    
-    /**
-     * Kiểm tra bảng có tồn tại
-     */
-    private function table_exists($table_name) {
-        global $wpdb;
-        return $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
-    }
+// Thêm menu admin để quản lý API
+function hmm_database_api_menu() {
+    add_menu_page(
+        'HMM Database API',
+        'HMM Database API',
+        'manage_options',
+        'hmm-database-api',
+        'hmm_database_api_page',
+        'dashicons-database',
+        30
+    );
 }
+add_action('admin_menu', 'hmm_database_api_menu');
 
-// Thêm endpoints tương thích với custom-api
-register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/insert', array(
-    'methods' => 'POST',
-    'callback' => array($this, 'insert_table_data'),
-    'permission_callback' => array($this, 'api_permissions_check'),
-));
+// Trang quản lý API
+function hmm_database_api_page() {
+    ?>
+    <div class="wrap">
+        <h1>HMM Database API</h1>
+        
+        <!-- API Status Card -->
+        <div class="card">
+            <h2>API Status</h2>
+            <p>API endpoint: <code><?php echo rest_url('hmm/v1/status'); ?></code></p>
+            <p>Version: 1.0.2 (Hỗ trợ thêm/sửa/xóa dữ liệu)</p>
+            <p>Để sử dụng API, bạn cần có thông tin xác thực WordPress hoặc Application Password.</p>
+            
+            <h3>Test API Connection</h3>
+            <div id="api-test-result">Click button để kiểm tra kết nối</div>
+            <button id="test-api-button" class="button button-primary">Test API Connection</button>
+            
+            <script>
+                document.getElementById('test-api-button').addEventListener('click', async function() {
+                    const resultElement = document.getElementById('api-test-result');
+                    resultElement.innerHTML = 'Đang kiểm tra kết nối...';
+                    
+                    try {
+                        const response = await fetch('<?php echo rest_url('hmm/v1/status'); ?>', {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            resultElement.innerHTML = '<div style="color: green;">Kết nối thành công! API đang hoạt động.</div>';
+                            resultElement.innerHTML += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        } else {
+                            resultElement.innerHTML = '<div style="color: red;">Kết nối thất bại! Mã lỗi: ' + response.status + '</div>';
+                        }
+                    } catch (error) {
+                        resultElement.innerHTML = '<div style="color: red;">Lỗi kiểm tra kết nối: ' + error.message + '</div>';
+                    }
+                });
+            </script>
+        </div>
+        
+        <!-- API Endpoints Card -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>Các endpoints có sẵn</h2>
+            <table class="widefat">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Mô tả</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/hmm/v1/status</code></td>
+                        <td>GET</td>
+                        <td>Kiểm tra trạng thái API</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/tables</code></td>
+                        <td>GET</td>
+                        <td>Lấy danh sách tất cả bảng</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/tables/{table_name}</code></td>
+                        <td>GET</td>
+                        <td>Lấy cấu trúc của bảng cụ thể</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/query</code></td>
+                        <td>POST</td>
+                        <td>Thực hiện truy vấn SQL (chỉ SELECT)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/data/{table}</code></td>
+                        <td>GET</td>
+                        <td>Lấy tất cả dữ liệu từ bảng</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/data/{table}</code></td>
+                        <td>POST</td>
+                        <td>Thêm dữ liệu mới vào bảng</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/data/{table}/{id}</code></td>
+                        <td>PUT</td>
+                        <td>Cập nhật dữ liệu trong bảng</td>
+                    </tr>
+                    <tr>
+                        <td><code>/hmm/v1/data/{table}/{id}</code></td>
+                        <td>DELETE</td>
+                        <td>Xóa dữ liệu khỏi bảng</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Compatibility Endpoints -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>Endpoints tương thích</h2>
+            <p>Các endpoints này được giữ lại để tương thích với phiên bản cũ:</p>
+            <table class="widefat">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Mô tả</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/custom/v1/db/{table}/insert</code></td>
+                        <td>POST</td>
+                        <td>Thêm dữ liệu mới (tương thích cũ)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/custom/v1/db/{table}/update/{id}</code></td>
+                        <td>PUT</td>
+                        <td>Cập nhật dữ liệu (tương thích cũ)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/custom/v1/db/{table}/delete/{id}</code></td>
+                        <td>DELETE</td>
+                        <td>Xóa dữ liệu (tương thích cũ)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Database Tables Card -->
+        <?php
+        // Hiển thị các bảng đã tạo
+        global $wpdb;
+        $custom_tables = $wpdb->get_results("SHOW TABLES LIKE '{$wpdb->prefix}hmm_%'", ARRAY_N);
+        if (!empty($custom_tables)) {
+            ?>
+            <div class="card" style="margin-top: 20px;">
+                <h2>Các bảng đã tạo</h2>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Tên bảng</th>
+                            <th>Số dòng</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        foreach ($custom_tables as $table) {
+                            $table_name = $table[0];
+                            $row_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+                            $short_name = str_replace($wpdb->prefix . 'hmm_', '', $table_name);
+                            ?>
+                            <tr>
+                                <td><?php echo esc_html($table_name); ?></td>
+                                <td><?php echo esc_html($row_count); ?></td>
+                                <td>
+                                    <button class="button view-structure" data-table="<?php echo esc_attr($table_name); ?>">
+                                        Xem cấu trúc
+                                    </button>
+                                    <div id="structure-<?php echo esc_attr($table_name); ?>" style="display: none;"></div>
+                                </td>
+                            </tr>
+                            <?php
+                        }
+                        ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <script>
+                document.querySelectorAll('.view-structure').forEach(button => {
+                    button.addEventListener('click', async function() {
+                        const tableName = this.dataset.table;
+                        const structureDiv = document.getElementById('structure-' + tableName);
+                        
+                        if (structureDiv.style.display === 'none') {
+                            try {
+                                const response = await fetch('<?php echo rest_url('hmm/v1/tables/'); ?>' + tableName, {
+                                    credentials: 'same-origin'
+                                });
+                                
+                                if (response.ok) {
+                                    const data = await response.json();
+                                    structureDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                                    structureDiv.style.display = 'block';
+                                } else {
+                                    structureDiv.innerHTML = '<div style="color: red;">Lỗi lấy cấu trúc bảng</div>';
+                                    structureDiv.style.display = 'block';
+                                }
+                            } catch (error) {
+                                structureDiv.innerHTML = '<div style="color: red;">Lỗi: ' + error.message + '</div>';
+                                structureDiv.style.display = 'block';
+                            }
+                        } else {
+                            structureDiv.style.display = 'none';
+                        }
+                    });
+                });
+            </script>
+            <?php
+        }
+        ?>
+        
+        <!-- API Documentation -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>Hướng dẫn sử dụng API</h2>
+            
+            <h3>1. Xác thực</h3>
+            <p>API sử dụng Basic Authentication với hai phương thức:</p>
+            <ul>
+                <li>WordPress user/password</li>
+                <li>Application Password (khuyến nghị)</li>
+            </ul>
+            
+            <h3>2. Ví dụ sử dụng</h3>
+            <pre>
+// Lấy dữ liệu từ bảng
+fetch('/wp-json/hmm/v1/data/suppliers', {
+    headers: {
+        'Authorization': 'Basic ' + btoa('username:application_password')
+    }
+})
 
-register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/update/(?P<id>\d+)', array(
-    'methods' => 'PUT',
-    'callback' => array($this, 'update_table_data'),
-    'permission_callback' => array($this, 'api_permissions_check'),
-));
+// Thêm dữ liệu mới
+fetch('/wp-json/hmm/v1/data/suppliers', {
+    method: 'POST',
+    headers: {
+        'Authorization': 'Basic ' + btoa('username:application_password'),
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        name: 'Nhà cung cấp mới',
+        email: 'email@example.com'
+    })
+})
 
-register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/delete/(?P<id>\d+)', array(
-    'methods' => 'DELETE',
-    'callback' => array($this, 'delete_table_data'),
-    'permission_callback' => array($this, 'api_permissions_check'),
-));
+// Cập nhật dữ liệu
+fetch('/wp-json/hmm/v1/data/suppliers/123', {
+    method: 'PUT',
+    headers: {
+        'Authorization': 'Basic ' + btoa('username:application_password'),
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        name: 'Tên mới'
+    })
+})
+
+// Xóa dữ liệu
+fetch('/wp-json/hmm/v1/data/suppliers/123', {
+    method: 'DELETE',
+    headers: {
+        'Authorization': 'Basic ' + btoa('username:application_password')
+    }
+})
+            </pre>
+            
+            <h3>3. Xử lý lỗi</h3>
+            <p>API trả về các mã lỗi HTTP tiêu chuẩn:</p>
+            <ul>
+                <li>200: Thành công</li>
+                <li>400: Lỗi dữ liệu đầu vào</li>
+                <li>401: Lỗi xác thực</li>
+                <li>403: Không có quyền</li>
+                <li>404: Không tìm thấy</li>
+                <li>500: Lỗi server</li>
+            </ul>
+        </div>
+        
+        <style>
+            .card {
+                background: #fff;
+                border: 1px solid #ccd0d4;
+                border-radius: 4px;
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            
+            .card h2 {
+                margin-top: 0;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 10px;
+            }
+            
+            .card h3 {
+                margin: 1.5em 0 1em;
+            }
+            
+            .widefat {
+                margin: 1em 0;
+            }
+            
+            pre {
+                background: #f5f5f5;
+                padding: 15px;
+                border-radius: 4px;
+                overflow-x: auto;
+            }
+            
+            .view-structure {
+                margin-right: 10px;
+            }
+            
+            #api-test-result {
+                margin: 1em 0;
+                padding: 10px;
+                background: #f5f5f5;
+                border-radius: 4px;
+            }
+            
+            .button {
+                margin: 5px;
+            }
+        </style>
+    </div>
+    <?php
+}
