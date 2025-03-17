@@ -103,7 +103,7 @@ class HMM_Database_API {
      */
     public function api_permissions_check($request) {
         // Nếu người dùng đã đăng nhập, kiểm tra quyền
-        if (current_user_can('manage_options')) {
+        if (is_user_logged_in() && current_user_can('manage_options')) {
             return true;
         }
         
@@ -111,7 +111,7 @@ class HMM_Database_API {
         $auth_header = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : false;
         
         if (!$auth_header) {
-            return false;
+            return new WP_Error('rest_forbidden', 'Không có thông tin xác thực.', array('status' => 401));
         }
 
         // Lấy thông tin xác thực từ header
@@ -119,32 +119,29 @@ class HMM_Database_API {
             $auth_data = base64_decode($matches[1]);
             list($username, $password) = explode(':', $auth_data, 2);
             
-            // Lấy user ID từ tên người dùng
+            // Lấy user từ tên người dùng
             $user = get_user_by('login', $username);
             
             if (!$user) {
-                return false;
+                return new WP_Error('rest_forbidden', 'Người dùng không tồn tại.', array('status' => 401));
             }
             
-            // Kiểm tra nếu đây là Application Password
-            if (wp_check_password($password, $user->user_pass)) {
-                // Mật khẩu cơ bản hợp lệ
+            // Kiểm tra mật khẩu thông thường
+            if (wp_check_password($password, $user->user_pass, $user->ID)) {
                 return user_can($user, 'manage_options');
             } else {
                 // Kiểm tra Application Password
                 require_once ABSPATH . 'wp-includes/class-wp-application-passwords.php';
-                $application_passwords = new WP_Application_Passwords();
-                
-                if (method_exists($application_passwords, 'validate_application_password')) {
-                    $result = $application_passwords->validate_application_password($user->user_login, $password);
-                    if (!is_wp_error($result)) {
+                if (class_exists('WP_Application_Passwords')) {
+                    $app_password = WP_Application_Passwords::check_application_password($user->ID, $password);
+                    if ($app_password && !is_wp_error($app_password)) {
                         return user_can($user, 'manage_options');
                     }
                 }
             }
         }
         
-        return false;
+        return new WP_Error('rest_forbidden', 'Xác thực không thành công.', array('status' => 401));
     }
     
     /**
@@ -161,7 +158,7 @@ class HMM_Database_API {
             'wordpress_version' => get_bloginfo('version'),
             'database_prefix' => $wpdb->prefix,
             'custom_tables' => $tables,
-            'write_support' => true, // Thêm flag này để client biết API hỗ trợ write
+            'write_support' => true,
             'timestamp' => current_time('mysql')
         );
     }
@@ -695,8 +692,13 @@ function hmm_database_api_page() {
                     resultElement.innerHTML = 'Đang kiểm tra kết nối...';
                     
                     try {
+                        // Lấy nonce từ WordPress để xác thực
+                        const nonce = '<?php echo wp_create_nonce('wp_rest'); ?>';
                         const response = await fetch('<?php echo rest_url('hmm/v1/status'); ?>', {
                             method: 'GET',
+                            headers: {
+                                'X-WP-Nonce': nonce
+                            },
                             credentials: 'same-origin'
                         });
                         
