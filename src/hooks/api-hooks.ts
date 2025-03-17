@@ -1,9 +1,10 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { checkAPIStatus } from "@/lib/api-utils";
 import { checkWooCommerceAuth, checkDatabaseApiAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
 import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
 import { toast } from "sonner";
-import { PaymentReceipt, Product, ProductVariation, StockTransaction, Supplier } from "@/types/models";
+import { PaymentReceipt, Product, ProductVariation, ProductWithVariations, StockTransaction, Supplier } from "@/types/models";
 import { mockSuppliers } from "@/lib/mock-data-suppliers";
 import { mockPaymentReceipts } from "@/lib/mock-data-payment-receipts";
 

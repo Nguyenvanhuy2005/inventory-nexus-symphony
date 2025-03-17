@@ -1,3 +1,4 @@
+
 export interface PaymentReceipt {
   id: number;
   receipt_id: string;
@@ -58,6 +59,11 @@ export interface ProductVariation {
   stock_status?: 'instock' | 'outofstock' | 'onbackorder' | string;
   attributes?: Array<{ name: string; option: string }>;
   image?: any;
+}
+
+export interface ProductWithVariations {
+  product: Product | null;
+  variations: ProductVariation[];
 }
 
 export interface Supplier {
