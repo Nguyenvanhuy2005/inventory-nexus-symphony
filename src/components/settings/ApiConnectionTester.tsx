@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api-utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const ApiEndpoints = {
   wordpress: [
@@ -27,9 +28,9 @@ const ApiEndpoints = {
 export default function ApiConnectionTester() {
   const [testing, setTesting] = useState(false);
   const [results, setResults] = useState<{
-    wordpress: { success: boolean; message: string }[];
-    woocommerce: { success: boolean; message: string }[];
-    databaseApi: { success: boolean; message: string }[];
+    wordpress: { success: boolean; message: string; error?: string }[];
+    woocommerce: { success: boolean; message: string; error?: string }[];
+    databaseApi: { success: boolean; message: string; error?: string }[];
   }>({
     wordpress: [],
     woocommerce: [],
@@ -52,9 +53,11 @@ export default function ApiConnectionTester() {
             message: `${endpoint.name}: Kết nối thành công`
           });
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Lỗi kết nối";
           wordpressResults.push({
             success: false,
-            message: `${endpoint.name}: ${error instanceof Error ? error.message : "Lỗi kết nối"}`
+            message: `${endpoint.name}: Kết nối thất bại`,
+            error: errorMessage
           });
         }
       }
@@ -68,9 +71,11 @@ export default function ApiConnectionTester() {
             message: `${endpoint.name}: Kết nối thành công`
           });
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Lỗi kết nối";
           woocommerceResults.push({
             success: false,
-            message: `${endpoint.name}: ${error instanceof Error ? error.message : "Lỗi kết nối"}`
+            message: `${endpoint.name}: Kết nối thất bại`,
+            error: errorMessage
           });
         }
       }
@@ -84,9 +89,11 @@ export default function ApiConnectionTester() {
             message: `${endpoint.name}: Kết nối thành công`
           });
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Lỗi kết nối";
           databaseApiResults.push({
             success: false,
-            message: `${endpoint.name}: ${error instanceof Error ? error.message : "Lỗi kết nối"}`
+            message: `${endpoint.name}: Kết nối thất bại`,
+            error: errorMessage
           });
         }
       }
@@ -106,26 +113,39 @@ export default function ApiConnectionTester() {
     }
   };
 
+  const renderResultItem = (result, index, prefix) => (
+    <li key={`${prefix}-${index}`} className="flex items-start gap-2">
+      {result.success ? (
+        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+      ) : (
+        <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+      )}
+      <div className="flex flex-col">
+        <span>{result.message}</span>
+        {result.error && (
+          <span className="text-sm text-red-500">{result.error}</span>
+        )}
+      </div>
+    </li>
+  );
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Kiểm tra kết nối API</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {results.wordpress.length === 0 && results.woocommerce.length === 0 && results.databaseApi.length === 0 && (
+          <div className="text-center py-6 text-muted-foreground">
+            Nhấn nút "Kiểm tra kết nối API" để xem tình trạng kết nối với các API.
+          </div>
+        )}
+
         {results.wordpress.length > 0 && (
           <div>
             <h3 className="text-lg font-medium mb-2">WordPress API</h3>
             <ul className="space-y-2">
-              {results.wordpress.map((result, index) => (
-                <li key={`wp-${index}`} className="flex items-center gap-2">
-                  {result.success ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <span>{result.message}</span>
-                </li>
-              ))}
+              {results.wordpress.map((result, index) => renderResultItem(result, index, 'wp'))}
             </ul>
           </div>
         )}
@@ -134,16 +154,7 @@ export default function ApiConnectionTester() {
           <div>
             <h3 className="text-lg font-medium mb-2">WooCommerce API</h3>
             <ul className="space-y-2">
-              {results.woocommerce.map((result, index) => (
-                <li key={`woo-${index}`} className="flex items-center gap-2">
-                  {result.success ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <span>{result.message}</span>
-                </li>
-              ))}
+              {results.woocommerce.map((result, index) => renderResultItem(result, index, 'woo'))}
             </ul>
           </div>
         )}
@@ -152,18 +163,33 @@ export default function ApiConnectionTester() {
           <div>
             <h3 className="text-lg font-medium mb-2">HMM Database API</h3>
             <ul className="space-y-2">
-              {results.databaseApi.map((result, index) => (
-                <li key={`db-${index}`} className="flex items-center gap-2">
-                  {result.success ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <span>{result.message}</span>
-                </li>
-              ))}
+              {results.databaseApi.map((result, index) => renderResultItem(result, index, 'db'))}
             </ul>
+
+            {results.databaseApi.some(r => !r.success) && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Nếu bạn thấy lỗi "401" hoặc "Unauthorized", hãy kiểm tra xác thực WordPress và đảm bảo rằng:
+                  <ol className="list-decimal ml-5 mt-2">
+                    <li>Plugin HMM Database API đã được kích hoạt</li>
+                    <li>Bạn đã đăng nhập vào WordPress với tên người dùng và mật khẩu đúng</li>
+                    <li>Bạn đã tạo Application Password trong WordPress</li>
+                    <li>Thông tin xác thực đã được nhập chính xác trong tab "Thông tin xác thực API"</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
+        )}
+
+        {(results.wordpress.some(r => !r.success) || results.woocommerce.some(r => !r.success) || results.databaseApi.some(r => !r.success)) && (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              Một số kết nối không thành công. Kiểm tra cài đặt xác thực API và đảm bảo rằng các plugin WordPress đã được kích hoạt đúng cách.
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
       <CardFooter>

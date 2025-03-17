@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { initializeDefaultCredentials, DEFAULT_WORDPRESS_CREDENTIALS } from "./auth-utils";
 
@@ -100,7 +101,8 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     };
     
     // Thêm Basic Auth cho tất cả các cuộc gọi API (bao gồm cả Database API)
-    headers['Authorization'] = 'Basic ' + btoa(`${username}:${password}`);
+    const authToken = btoa(`${username}:${password}`);
+    headers['Authorization'] = `Basic ${authToken}`;
     
     const fetchOptions = {
       method: options.method || 'GET',
@@ -121,12 +123,18 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       ? `${API_BASE_URL}${endpoint}`
       : `${API_BASE_URL}/custom/v1${endpoint}`;
       
-    console.info(`Fetching ${isDatabaseApiCall ? 'Database' : 'Custom'} API: ${endpoint}`, url);
+    console.info(`Fetching ${isDatabaseApiCall ? 'Database' : 'Custom'} API: ${endpoint}`, {
+      url,
+      hasAuth: !!authToken,
+      username: username
+    });
     
     const response = await fetch(url, fetchOptions);
     
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`API request failed (${response.status}):`, errorText);
+      throw new Error(`API request failed: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
