@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useState, useEffect } from "react";
 import { fetchCustomAPI } from "@/lib/api-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+import { Info, AlertCircle } from "lucide-react";
 
 interface DbTable {
   table_name: string;
@@ -31,7 +31,7 @@ export default function DatabaseApiInfo() {
         setError(null);
       } catch (err) {
         console.error('Error fetching database tables:', err);
-        setError('Không thể kết nối đến Database API. Vui lòng kiểm tra cài đặt plugin.');
+        setError('Không thể kết nối đến Database API. Vui lòng kiểm tra cài đặt plugin và xác thực.');
         setTables([]);
       } finally {
         setLoading(false);
@@ -61,6 +61,14 @@ export default function DatabaseApiInfo() {
           <code className="block bg-gray-100 p-2 rounded">
             https://hmm.vn/wp-json/hmm/v1/status
           </code>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium mb-2">Xác thực API</h3>
+          <p className="mb-2">
+            API này sử dụng Basic Authentication với tên người dùng WordPress và Application Password. 
+            Đảm bảo bạn đã cấu hình đúng trong phần "Thông tin xác thực API".
+          </p>
         </div>
 
         <div>
@@ -107,6 +115,7 @@ export default function DatabaseApiInfo() {
           <div className="flex justify-center py-4">Đang tải thông tin bảng...</div>
         ) : error ? (
           <Alert className="bg-red-50 text-red-800 border-red-200">
+            <AlertCircle className="h-4 w-4" />
             <AlertTitle>Lỗi kết nối</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>

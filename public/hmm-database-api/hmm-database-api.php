@@ -1,9 +1,8 @@
-
 <?php
 /**
  * Plugin Name: HMM Database API
  * Description: API để kết nối cơ sở dữ liệu WordPress với ứng dụng HMM Inventory
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: HMM
  */
 
@@ -22,6 +21,18 @@ class HMM_Database_API {
         
         // Tạo bảng khi kích hoạt plugin
         register_activation_hook(__FILE__, array($this, 'create_custom_tables'));
+        
+        // Cho phép CORS trong development
+        add_action('rest_api_init', function() {
+            remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
+            add_filter('rest_pre_serve_request', function($value) {
+                header('Access-Control-Allow-Origin: *');
+                header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+                header('Access-Control-Allow-Credentials: true');
+                header('Access-Control-Expose-Headers: Link', false);
+                return $value;
+            });
+        }, 15);
     }
     
     /**
@@ -66,10 +77,52 @@ class HMM_Database_API {
     
     /**
      * Kiểm tra quyền truy cập API
+     * Đã sửa để hỗ trợ cả Application Passwords và quyền quản trị
      */
-    public function api_permissions_check() {
-        // Kiểm tra xem người dùng đã đăng nhập chưa và có quyền 'manage_options'
-        return current_user_can('manage_options');
+    public function api_permissions_check($request) {
+        // Nếu người dùng đã đăng nhập, kiểm tra quyền
+        if (current_user_can('manage_options')) {
+            return true;
+        }
+        
+        // Kiểm tra xác thực bằng Application Password
+        $auth_header = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : false;
+        
+        if (!$auth_header) {
+            return false;
+        }
+
+        // Lấy thông tin xác thực từ header
+        if (preg_match('/Basic\s+(.*)$/i', $auth_header, $matches)) {
+            $auth_data = base64_decode($matches[1]);
+            list($username, $password) = explode(':', $auth_data, 2);
+            
+            // Lấy user ID từ tên người dùng
+            $user = get_user_by('login', $username);
+            
+            if (!$user) {
+                return false;
+            }
+            
+            // Kiểm tra nếu đây là Application Password
+            if (wp_check_password($password, $user->user_pass)) {
+                // Mật khẩu cơ bản hợp lệ
+                return user_can($user, 'manage_options');
+            } else {
+                // Kiểm tra Application Password
+                require_once ABSPATH . 'wp-includes/class-wp-application-passwords.php';
+                $application_passwords = new WP_Application_Passwords();
+                
+                if (method_exists($application_passwords, 'validate_application_password')) {
+                    $result = $application_passwords->validate_application_password($user->user_login, $password);
+                    if (!is_wp_error($result)) {
+                        return user_can($user, 'manage_options');
+                    }
+                }
+            }
+        }
+        
+        return false;
     }
     
     /**
@@ -82,7 +135,7 @@ class HMM_Database_API {
         
         return array(
             'status' => 'active',
-            'version' => '1.0.0',
+            'version' => '1.0.1',
             'wordpress_version' => get_bloginfo('version'),
             'database_prefix' => $wpdb->prefix,
             'custom_tables' => $tables,
@@ -268,7 +321,7 @@ class HMM_Database_API {
         dbDelta($sql);
         
         // Lưu version của database để kiểm tra cập nhật sau này
-        add_option('hmm_database_version', '1.0.0');
+        add_option('hmm_database_version', '1.0.1');
     }
     
     /**
@@ -505,7 +558,34 @@ function hmm_database_api_page() {
         <div class="card">
             <h2>API Status</h2>
             <p>API endpoint: <code><?php echo rest_url('hmm/v1/status'); ?></code></p>
-            <p>Để sử dụng API, bạn cần có thông tin xác thực WordPress.</p>
+            <p>Để sử dụng API, bạn cần có thông tin xác thực WordPress hoặc Application Password.</p>
+            
+            <h3>Test API Connection</h3>
+            <div id="api-test-result">Click button để kiểm tra kết nối</div>
+            <button id="test-api-button" class="button button-primary">Test API Connection</button>
+            
+            <script>
+                document.getElementById('test-api-button').addEventListener('click', async function() {
+                    const resultElement = document.getElementById('api-test-result');
+                    resultElement.innerHTML = 'Đang kiểm tra kết nối...';
+                    
+                    try {
+                        const response = await fetch('<?php echo rest_url('hmm/v1/status'); ?>', {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            resultElement.innerHTML = '<div style="color: green;">Kết nối thành công! API đang hoạt động.</div>';
+                        } else {
+                            resultElement.innerHTML = '<div style="color: red;">Kết nối thất bại! Mã lỗi: ' + response.status + '</div>';
+                        }
+                    } catch (error) {
+                        resultElement.innerHTML = '<div style="color: red;">Lỗi kiểm tra kết nối: ' + error.message + '</div>';
+                    }
+                });
+            </script>
         </div>
         
         <div class="card" style="margin-top: 20px;">
@@ -585,3 +665,4 @@ function hmm_database_api_page() {
     </div>
     <?php
 }
+

@@ -89,12 +89,22 @@ export async function checkAPIStatus() {
  */
 export async function fetchCustomAPI(endpoint: string, options: any = {}) {
   try {
+    // Lấy thông tin xác thực từ localStorage hoặc mặc định
+    const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
+    const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
+    
+    // Chuẩn bị header xác thực
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    
+    // Thêm Basic Auth cho tất cả các cuộc gọi API (bao gồm cả Database API)
+    headers['Authorization'] = 'Basic ' + btoa(`${username}:${password}`);
+    
     const fetchOptions = {
       method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
+      headers: headers,
       ...options
     };
 
