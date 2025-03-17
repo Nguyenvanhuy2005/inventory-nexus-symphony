@@ -10,6 +10,7 @@ import { fetchCustomAPI } from './custom-api';
  */
 export async function fetchDatabaseTable(tableName: string, options: any = {}) {
   try {
+    // Sử dụng endpoint truy vấn SQL tiêu chuẩn
     const query = `SELECT * FROM wp_hmm_${tableName} LIMIT 100`;
     const result = await fetchCustomAPI('/hmm/v1/query', {
       method: 'POST',
@@ -40,19 +41,22 @@ export async function fetchDatabaseTable(tableName: string, options: any = {}) {
  */
 export async function insertDatabaseRecord(tableName: string, data: any) {
   try {
-    // Call the new database API endpoint for insertion
-    const result = await fetchCustomAPI(`/custom/v1/db/${tableName}/insert`, {
+    // Sử dụng endpoint chính thức của API
+    const result = await fetchCustomAPI(`/hmm/v1/tables/wp_hmm_${tableName}/insert`, {
       method: 'POST',
-      body: { 
-        table: `hmm_${tableName}`,
-        data: data
-      }
+      body: data
     });
     
     console.log(`Inserted record into ${tableName}:`, result);
+    
+    if (result && result.success) {
+      toast.success(`Đã thêm dữ liệu vào bảng ${tableName} thành công`);
+    }
+    
     return result;
   } catch (error) {
     console.error(`Error inserting into table ${tableName}:`, error);
+    toast.error(`Lỗi thêm dữ liệu vào bảng ${tableName}: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
     throw error;
   }
 }
@@ -66,20 +70,22 @@ export async function insertDatabaseRecord(tableName: string, data: any) {
  */
 export async function updateDatabaseRecord(tableName: string, id: number, data: any) {
   try {
-    // Call the new database API endpoint for updating
-    const result = await fetchCustomAPI(`/custom/v1/db/${tableName}/update/${id}`, {
+    // Sử dụng endpoint chính thức của API
+    const result = await fetchCustomAPI(`/hmm/v1/tables/wp_hmm_${tableName}/update/${id}`, {
       method: 'PUT',
-      body: { 
-        table: `hmm_${tableName}`,
-        id: id,
-        data: data
-      }
+      body: data
     });
     
     console.log(`Updated record ${id} in ${tableName}:`, result);
+    
+    if (result && result.success) {
+      toast.success(`Đã cập nhật dữ liệu trong bảng ${tableName} thành công`);
+    }
+    
     return result;
   } catch (error) {
     console.error(`Error updating record ${id} in table ${tableName}:`, error);
+    toast.error(`Lỗi cập nhật dữ liệu trong bảng ${tableName}: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
     throw error;
   }
 }
@@ -92,19 +98,21 @@ export async function updateDatabaseRecord(tableName: string, id: number, data: 
  */
 export async function deleteDatabaseRecord(tableName: string, id: number) {
   try {
-    // Call the new database API endpoint for deletion
-    const result = await fetchCustomAPI(`/custom/v1/db/${tableName}/delete/${id}`, {
-      method: 'DELETE',
-      body: { 
-        table: `hmm_${tableName}`,
-        id: id
-      }
+    // Sử dụng endpoint chính thức của API
+    const result = await fetchCustomAPI(`/hmm/v1/tables/wp_hmm_${tableName}/delete/${id}`, {
+      method: 'DELETE'
     });
     
     console.log(`Deleted record ${id} from ${tableName}:`, result);
+    
+    if (result && result.success) {
+      toast.success(`Đã xóa dữ liệu từ bảng ${tableName} thành công`);
+    }
+    
     return result;
   } catch (error) {
     console.error(`Error deleting record ${id} from table ${tableName}:`, error);
+    toast.error(`Lỗi xóa dữ liệu từ bảng ${tableName}: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
     throw error;
   }
 }
