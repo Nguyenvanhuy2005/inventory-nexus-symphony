@@ -7,8 +7,11 @@ import {
   checkAPIStatus, 
   fetchWooCommerce, 
   fetchCustomAPI, 
-  fetchDatabaseTable, 
-  executeDatabaseQuery 
+  fetchDatabaseTable,
+  executeDatabaseQuery,
+  insertDatabaseRecord,
+  updateDatabaseRecord,
+  deleteDatabaseRecord
 } from "@/lib/api";
 import { 
   checkWooCommerceAuth, 
@@ -340,22 +343,27 @@ export function useCreateSupplier() {
   return useMutation({
     mutationFn: async (data: any) => {
       try {
-        // Try to insert directly into the database
-        const query = `
-          INSERT INTO wp_hmm_suppliers 
-          (name, contact_name, phone, email, address, initial_debt, current_debt, total_debt, notes, status, created_at, updated_at) 
-          VALUES 
-          ('${data.name}', '${data.contact_name || ''}', '${data.phone || ''}', '${data.email || ''}', 
-           '${data.address || ''}', ${data.initial_debt || 0}, ${data.current_debt || 0}, ${data.total_debt || 0}, 
-           '${data.notes || ''}', '${data.status}', NOW(), NOW())
-        `;
+        // Try to insert using the Custom API database endpoint
+        const result = await insertDatabaseRecord('suppliers', {
+          name: data.name,
+          contact_name: data.contact_name || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          address: data.address || '',
+          initial_debt: data.initial_debt || 0,
+          current_debt: data.current_debt || 0,
+          total_debt: data.total_debt || 0,
+          notes: data.notes || '',
+          status: data.status,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
         
-        const result = await executeDatabaseQuery(query, { suppressToast: false });
         toast.success('Đã tạo nhà cung cấp mới thành công');
         
         // Return the created supplier with ID
         return { 
-          id: result.insert_id,
+          id: result.insert_id || Date.now(),
           ...data,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -392,27 +400,13 @@ export function useUpdateSupplier() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       try {
-        // Try to update directly in the database
-        let setClause = Object.entries(data)
-          .filter(([key, _]) => key !== 'id') // Exclude ID from the SET clause
-          .map(([key, value]) => {
-            if (typeof value === 'string') {
-              return `${key} = '${value.replace(/'/g, "\\'")}'`; // Escape single quotes
-            } else {
-              return `${key} = ${value}`;
-            }
-          })
-          .join(', ');
+        // Try to update using the Custom API database endpoint
+        const updateData = {
+          ...data,
+          updated_at: new Date().toISOString()
+        };
         
-        setClause += `, updated_at = NOW()`;
-        
-        const query = `
-          UPDATE wp_hmm_suppliers 
-          SET ${setClause}
-          WHERE id = ${id}
-        `;
-        
-        await executeDatabaseQuery(query, { suppressToast: false });
+        await updateDatabaseRecord('suppliers', id, updateData);
         toast.success('Đã cập nhật nhà cung cấp thành công');
         
         // Return the updated supplier
@@ -449,9 +443,8 @@ export function useDeleteSupplier() {
   return useMutation({
     mutationFn: async (id: number) => {
       try {
-        // Try to delete directly from the database
-        const query = `DELETE FROM wp_hmm_suppliers WHERE id = ${id}`;
-        await executeDatabaseQuery(query, { suppressToast: false });
+        // Try to delete using the Custom API database endpoint
+        await deleteDatabaseRecord('suppliers', id);
         toast.success('Đã xóa nhà cung cấp thành công');
         
         return { success: true };

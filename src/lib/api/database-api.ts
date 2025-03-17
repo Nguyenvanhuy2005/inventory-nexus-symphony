@@ -112,3 +112,96 @@ export async function countDatabaseRecords(tableName: string, whereClause?: stri
     return 0;
   }
 }
+
+/**
+ * Thêm dữ liệu vào bảng thông qua Custom API (thay vì truy vấn SQL trực tiếp)
+ * @param tableName Tên bảng (không có tiền tố)
+ * @param data Dữ liệu cần thêm
+ * @param options Tùy chọn bổ sung
+ * @returns Promise với kết quả thêm dữ liệu
+ */
+export async function insertDatabaseRecord(tableName: string, data: Record<string, any>, options: any = {}) {
+  try {
+    // Import fetchCustomAPI dynamically to avoid circular dependencies
+    const { fetchCustomAPI } = await import("./custom-api");
+    
+    // Sử dụng endpoint để thêm dữ liệu thay vì truy vấn INSERT
+    const endpoint = `/custom/v1/db/${tableName}/insert`;
+    const result = await fetchCustomAPI(endpoint, {
+      method: 'POST',
+      body: data,
+      ...options
+    });
+    
+    console.info(`Inserted data into table ${tableName}:`, { data, result });
+    return result;
+  } catch (error) {
+    console.error(`Error inserting into table ${tableName}:`, error);
+    if (!options.suppressToast) {
+      toast.error(`Lỗi khi thêm dữ liệu vào bảng ${tableName}: ${error instanceof Error ? error.message : 'Không thể kết nối tới API'}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Cập nhật dữ liệu trong bảng thông qua Custom API (thay vì truy vấn SQL trực tiếp)
+ * @param tableName Tên bảng (không có tiền tố)
+ * @param id ID của bản ghi cần cập nhật
+ * @param data Dữ liệu cần cập nhật
+ * @param options Tùy chọn bổ sung
+ * @returns Promise với kết quả cập nhật dữ liệu
+ */
+export async function updateDatabaseRecord(tableName: string, id: number, data: Record<string, any>, options: any = {}) {
+  try {
+    // Import fetchCustomAPI dynamically to avoid circular dependencies
+    const { fetchCustomAPI } = await import("./custom-api");
+    
+    // Sử dụng endpoint để cập nhật dữ liệu thay vì truy vấn UPDATE
+    const endpoint = `/custom/v1/db/${tableName}/update/${id}`;
+    const result = await fetchCustomAPI(endpoint, {
+      method: 'PUT',
+      body: data,
+      ...options
+    });
+    
+    console.info(`Updated data in table ${tableName} for ID ${id}:`, { data, result });
+    return result;
+  } catch (error) {
+    console.error(`Error updating table ${tableName} record ${id}:`, error);
+    if (!options.suppressToast) {
+      toast.error(`Lỗi khi cập nhật dữ liệu trong bảng ${tableName}: ${error instanceof Error ? error.message : 'Không thể kết nối tới API'}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Xóa dữ liệu trong bảng thông qua Custom API (thay vì truy vấn SQL trực tiếp)
+ * @param tableName Tên bảng (không có tiền tố)
+ * @param id ID của bản ghi cần xóa
+ * @param options Tùy chọn bổ sung
+ * @returns Promise với kết quả xóa dữ liệu
+ */
+export async function deleteDatabaseRecord(tableName: string, id: number, options: any = {}) {
+  try {
+    // Import fetchCustomAPI dynamically to avoid circular dependencies
+    const { fetchCustomAPI } = await import("./custom-api");
+    
+    // Sử dụng endpoint để xóa dữ liệu thay vì truy vấn DELETE
+    const endpoint = `/custom/v1/db/${tableName}/delete/${id}`;
+    const result = await fetchCustomAPI(endpoint, {
+      method: 'DELETE',
+      ...options
+    });
+    
+    console.info(`Deleted data from table ${tableName} for ID ${id}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Error deleting from table ${tableName} record ${id}:`, error);
+    if (!options.suppressToast) {
+      toast.error(`Lỗi khi xóa dữ liệu từ bảng ${tableName}: ${error instanceof Error ? error.message : 'Không thể kết nối tới API'}`);
+    }
+    throw error;
+  }
+}
