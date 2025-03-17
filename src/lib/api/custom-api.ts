@@ -27,14 +27,22 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     const authToken = btoa(`${username}:${password}`);
     headers['Authorization'] = `Basic ${authToken}`;
     
-    const fetchOptions = {
+    // Allow OPTIONS requests for CORS preflight
+    const fetchOptions: RequestInit = {
       method: options.method || 'GET',
       headers: headers,
+      credentials: 'include', // Include cookies if any
       ...options
     };
 
+    // Remove headers property since we've already processed it
+    if (fetchOptions.headers !== headers) {
+      delete fetchOptions.headers;
+      fetchOptions.headers = headers;
+    }
+
     // If there's a body, stringify it
-    if (options.body && typeof options.body === 'object') {
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
@@ -51,6 +59,14 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       method: fetchOptions.method,
       hasAuth: !!authToken,
       username: username
+    });
+    
+    // Log full authentication info for debugging
+    console.log('Authentication details:', {
+      endpoint,
+      authHeader: `Basic ${authToken.substring(0, 5)}...`,
+      url: url,
+      credentials: fetchOptions.credentials
     });
     
     const response = await fetch(url, fetchOptions);
@@ -92,7 +108,30 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
  */
 export async function checkDatabaseApiAuth() {
   try {
-    const result = await fetchCustomAPI('/hmm/v1/status', { suppressToast: true });
+    // Log that we're checking authentication
+    console.log('Checking Database API authentication...');
+    
+    // Use explicit credentials instead of relying on fetchCustomAPI to handle it
+    const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
+    const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
+    const authToken = btoa(`${username}:${password}`);
+    
+    // Log credentials being used (partially masked for security)
+    console.log('Using credentials:', {
+      username: username,
+      passwordLength: password ? password.length : 0,
+      authTokenStart: authToken.substring(0, 10) + '...'
+    });
+    
+    const result = await fetchCustomAPI('/hmm/v1/status', { 
+      suppressToast: true,
+      headers: {
+        'Authorization': `Basic ${authToken}`
+      }
+    });
+    
+    console.log('Database API auth check succeeded:', result);
+    
     return {
       isAuthenticated: true,
       error: null,
@@ -105,7 +144,7 @@ export async function checkDatabaseApiAuth() {
     let errorMessage = 'Không thể kết nối tới Database API';
     if (error instanceof Error) {
       if (error.message.includes('401')) {
-        errorMessage = 'Lỗi xác thực: Thông tin đăng nhập không hợp lệ';
+        errorMessage = 'Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ';
       } else if (error.message.includes('404')) {
         errorMessage = 'Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt';
       }

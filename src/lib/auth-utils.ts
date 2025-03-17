@@ -1,3 +1,4 @@
+
 import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from './api';
 
 /**
@@ -40,6 +41,22 @@ export async function checkWooCommerceAuth(): Promise<boolean> {
  */
 export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean, error: string | null}> {
   try {
+    const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
+    const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
+    
+    if (!username || !password) {
+      console.error('Missing WordPress credentials');
+      return {
+        isAuthenticated: false,
+        error: 'Thiếu thông tin đăng nhập WordPress'
+      };
+    }
+    
+    console.log('Checking Database API auth with credentials:', {
+      username: username,
+      passwordLength: password ? password.length : 0
+    });
+    
     // Try to fetch the status endpoint to check authentication
     await fetchCustomAPI('/hmm/v1/status', { suppressToast: true });
     return {
@@ -126,7 +143,9 @@ export function initializeDefaultCredentials() {
   
   console.log('API credentials initialized:',  {
     woo_key: localStorage.getItem('woocommerce_consumer_key'),
-    woo_secret: localStorage.getItem('woocommerce_consumer_secret')?.substring(0, 5) + '...'
+    woo_secret: localStorage.getItem('woocommerce_consumer_secret')?.substring(0, 5) + '...',
+    wp_username: localStorage.getItem('wordpress_username'),
+    wp_password_length: localStorage.getItem('wordpress_application_password')?.length || 0
   });
 }
 
@@ -142,4 +161,26 @@ export function isFullyConnected(): boolean {
                           !!localStorage.getItem('wordpress_application_password');
   
   return hasWooCredentials && hasWpCredentials;
+}
+
+/**
+ * Clear any saved API credentials (for logout/reset)
+ */
+export function clearApiCredentials() {
+  localStorage.removeItem('woocommerce_consumer_key');
+  localStorage.removeItem('woocommerce_consumer_secret');
+  localStorage.removeItem('wordpress_username');
+  localStorage.removeItem('wordpress_application_password');
+  console.log('All API credentials cleared');
+}
+
+/**
+ * Get current WordPress credentials
+ * @returns WordPress username and application password
+ */
+export function getWordPressCredentials() {
+  return {
+    username: localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username,
+    applicationPassword: localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password
+  };
 }
