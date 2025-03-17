@@ -481,188 +481,178 @@ class HMM_Database_API {
             $sql .= ", ";
         }
         
-        // Thêm khóa chính
-        if (isset($params['primary_key'])) {
-            $primary_key = sanitize_key($params['primary_key']);
-            $sql .= "PRIMARY KEY ($primary_key)";
-        } else {
-            // Xóa dấu phẩy cuối cùng
-            $sql = rtrim($sql, ", ");
+        // Thêm endpoints để thao tác với dữ liệu trong bảng
+        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_table_data'),
+            'permission_callback' => array($this, 'api_permissions_check'),
+        ));
+        
+        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'insert_table_data'),
+            'permission_callback' => array($this, 'api_permissions_check'),
+        ));
+        
+        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)/(?P<id>\d+)', array(
+            'methods' => 'PUT',
+            'callback' => array($this, 'update_table_data'),
+            'permission_callback' => array($this, 'api_permissions_check'),
+        ));
+        
+        register_rest_route('hmm/v1', '/data/(?P<table>[a-zA-Z0-9_-]+)/(?P<id>\d+)', array(
+            'methods' => 'DELETE',
+            'callback' => array($this, 'delete_table_data'),
+            'permission_callback' => array($this, 'api_permissions_check'),
+        ));
+    }
+    
+    /**
+     * Lấy dữ liệu từ bảng
+     */
+    public function get_table_data($request) {
+        global $wpdb;
+        
+        $table = $request['table'];
+        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
+        
+        // Kiểm tra bảng tồn tại
+        if (!$this->table_exists($table_name)) {
+            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
         }
         
-        $sql .= ") $charset_collate;";
-        
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
+        // Thực hiện truy vấn
+        $results = $wpdb->get_results("SELECT * FROM $table_name", ARRAY_A);
         
         if ($wpdb->last_error) {
-            return new WP_Error('create_table_error', $wpdb->last_error, array('status' => 400));
+            return new WP_Error('query_error', $wpdb->last_error, array('status' => 400));
         }
         
         return array(
-            'success' => true,
-            'table_name' => $table_name,
-            'message' => 'Đã tạo bảng thành công'
+            'data' => $results,
+            'total' => count($results)
         );
     }
     
     /**
-     * Lấy danh sách các bảng tùy chỉnh
+     * Thêm dữ liệu vào bảng
      */
-    private function get_custom_tables() {
+    public function insert_table_data($request) {
         global $wpdb;
         
-        $tables = array();
-        $custom_prefix = $wpdb->prefix . 'hmm_';
+        $table = $request['table'];
+        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
         
-        $all_tables = $wpdb->get_results("SHOW TABLES LIKE '{$custom_prefix}%'", ARRAY_N);
-        
-        foreach ($all_tables as $table) {
-            $table_name = $table[0];
-            $short_name = str_replace($custom_prefix, '', $table_name);
-            $row_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
-            
-            $tables[] = array(
-                'name' => $table_name,
-                'short_name' => $short_name,
-                'rows' => $row_count
-            );
+        // Kiểm tra bảng tồn tại
+        if (!$this->table_exists($table_name)) {
+            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
         }
         
-        return $tables;
+        $data = $request->get_json_params();
+        
+        // Thực hiện chèn dữ liệu
+        $result = $wpdb->insert($table_name, $data);
+        
+        if ($result === false) {
+            return new WP_Error('insert_error', $wpdb->last_error, array('status' => 400));
+        }
+        
+        return array(
+            'success' => true,
+            'id' => $wpdb->insert_id,
+            'message' => 'Đã thêm dữ liệu thành công'
+        );
+    }
+    
+    /**
+     * Cập nhật dữ liệu trong bảng
+     */
+    public function update_table_data($request) {
+        global $wpdb;
+        
+        $table = $request['table'];
+        $id = $request['id'];
+        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
+        
+        // Kiểm tra bảng tồn tại
+        if (!$this->table_exists($table_name)) {
+            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
+        }
+        
+        $data = $request->get_json_params();
+        
+        // Thực hiện cập nhật
+        $result = $wpdb->update(
+            $table_name,
+            $data,
+            array('id' => $id)
+        );
+        
+        if ($result === false) {
+            return new WP_Error('update_error', $wpdb->last_error, array('status' => 400));
+        }
+        
+        return array(
+            'success' => true,
+            'message' => 'Đã cập nhật dữ liệu thành công'
+        );
+    }
+    
+    /**
+     * Xóa dữ liệu khỏi bảng
+     */
+    public function delete_table_data($request) {
+        global $wpdb;
+        
+        $table = $request['table'];
+        $id = $request['id'];
+        $table_name = $wpdb->prefix . 'hmm_' . sanitize_key($table);
+        
+        // Kiểm tra bảng tồn tại
+        if (!$this->table_exists($table_name)) {
+            return new WP_Error('table_not_found', 'Không tìm thấy bảng', array('status' => 404));
+        }
+        
+        // Thực hiện xóa
+        $result = $wpdb->delete(
+            $table_name,
+            array('id' => $id)
+        );
+        
+        if ($result === false) {
+            return new WP_Error('delete_error', $wpdb->last_error, array('status' => 400));
+        }
+        
+        return array(
+            'success' => true,
+            'message' => 'Đã xóa dữ liệu thành công'
+        );
+    }
+    
+    /**
+     * Kiểm tra bảng có tồn tại
+     */
+    private function table_exists($table_name) {
+        global $wpdb;
+        return $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
     }
 }
 
-// Khởi tạo plugin
-new HMM_Database_API();
+// Thêm endpoints tương thích với custom-api
+register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/insert', array(
+    'methods' => 'POST',
+    'callback' => array($this, 'insert_table_data'),
+    'permission_callback' => array($this, 'api_permissions_check'),
+));
 
-// Thêm menu admin để quản lý API
-function hmm_database_api_menu() {
-    add_menu_page(
-        'HMM Database API',
-        'HMM Database API',
-        'manage_options',
-        'hmm-database-api',
-        'hmm_database_api_page',
-        'dashicons-database',
-        30
-    );
-}
-add_action('admin_menu', 'hmm_database_api_menu');
+register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/update/(?P<id>\d+)', array(
+    'methods' => 'PUT',
+    'callback' => array($this, 'update_table_data'),
+    'permission_callback' => array($this, 'api_permissions_check'),
+));
 
-// Trang quản lý API
-function hmm_database_api_page() {
-    ?>
-    <div class="wrap">
-        <h1>HMM Database API</h1>
-        <div class="card">
-            <h2>API Status</h2>
-            <p>API endpoint: <code><?php echo rest_url('hmm/v1/status'); ?></code></p>
-            <p>Để sử dụng API, bạn cần có thông tin xác thực WordPress hoặc Application Password.</p>
-            
-            <h3>Test API Connection</h3>
-            <div id="api-test-result">Click button để kiểm tra kết nối</div>
-            <button id="test-api-button" class="button button-primary">Test API Connection</button>
-            
-            <script>
-                document.getElementById('test-api-button').addEventListener('click', async function() {
-                    const resultElement = document.getElementById('api-test-result');
-                    resultElement.innerHTML = 'Đang kiểm tra kết nối...';
-                    
-                    try {
-                        const response = await fetch('<?php echo rest_url('hmm/v1/status'); ?>', {
-                            method: 'GET',
-                            credentials: 'same-origin'
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            resultElement.innerHTML = '<div style="color: green;">Kết nối thành công! API đang hoạt động.</div>';
-                        } else {
-                            resultElement.innerHTML = '<div style="color: red;">Kết nối thất bại! Mã lỗi: ' + response.status + '</div>';
-                        }
-                    } catch (error) {
-                        resultElement.innerHTML = '<div style="color: red;">Lỗi kiểm tra kết nối: ' + error.message + '</div>';
-                    }
-                });
-            </script>
-        </div>
-        
-        <div class="card" style="margin-top: 20px;">
-            <h2>Các endpoints có sẵn</h2>
-            <table class="widefat">
-                <thead>
-                    <tr>
-                        <th>Endpoint</th>
-                        <th>Method</th>
-                        <th>Mô tả</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>/hmm/v1/status</code></td>
-                        <td>GET</td>
-                        <td>Kiểm tra trạng thái API</td>
-                    </tr>
-                    <tr>
-                        <td><code>/hmm/v1/tables</code></td>
-                        <td>GET</td>
-                        <td>Lấy danh sách tất cả bảng</td>
-                    </tr>
-                    <tr>
-                        <td><code>/hmm/v1/tables/{table_name}</code></td>
-                        <td>GET</td>
-                        <td>Lấy cấu trúc của bảng cụ thể</td>
-                    </tr>
-                    <tr>
-                        <td><code>/hmm/v1/query</code></td>
-                        <td>POST</td>
-                        <td>Thực hiện truy vấn SQL (chỉ SELECT)</td>
-                    </tr>
-                    <tr>
-                        <td><code>/hmm/v1/tables</code></td>
-                        <td>POST</td>
-                        <td>Tạo bảng mới</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <?php
-        // Hiển thị các bảng đã tạo
-        global $wpdb;
-        $custom_tables = $wpdb->get_results("SHOW TABLES LIKE '{$wpdb->prefix}hmm_%'", ARRAY_N);
-        if (!empty($custom_tables)) {
-            ?>
-            <div class="card" style="margin-top: 20px;">
-                <h2>Các bảng đã tạo</h2>
-                <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th>Tên bảng</th>
-                            <th>Số dòng</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        foreach ($custom_tables as $table) {
-                            $table_name = $table[0];
-                            $row_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
-                            ?>
-                            <tr>
-                                <td><?php echo esc_html($table_name); ?></td>
-                                <td><?php echo esc_html($row_count); ?></td>
-                            </tr>
-                            <?php
-                        }
-                        ?>
-                    </tbody>
-                </table>
-            </div>
-            <?php
-        }
-        ?>
-    </div>
-    <?php
-}
-
+register_rest_route('custom/v1/db', '/(?P<table>[a-zA-Z0-9_-]+)/delete/(?P<id>\d+)', array(
+    'methods' => 'DELETE',
+    'callback' => array($this, 'delete_table_data'),
+    'permission_callback' => array($this, 'api_permissions_check'),
+));
