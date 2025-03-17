@@ -1,12 +1,12 @@
 
 import { useState } from "react";
-import { useGetStockAdjustments } from "@/hooks/api-hooks";
+import { useGetStockAdjustments } from "@/hooks/api";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { exportToCSV } from "@/lib/api-utils";
+import { exportToCSV } from "@/lib/api/utils";
 import { Download, Plus, Loader2 } from "lucide-react";
 import StockAdjustmentForm from "@/components/inventory/StockAdjustmentForm";
 
