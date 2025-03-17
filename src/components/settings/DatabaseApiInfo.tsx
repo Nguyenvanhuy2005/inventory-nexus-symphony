@@ -1,10 +1,12 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect } from "react";
-import { fetchCustomAPI } from "@/lib/api-utils";
+import { fetchCustomAPI, fetchDatabaseTable } from "@/lib/api-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info, AlertCircle, ShieldCheck } from "lucide-react";
+import { Info, AlertCircle, ShieldCheck, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface DbTable {
   table_name: string;
@@ -18,6 +20,10 @@ export default function DatabaseApiInfo() {
   const [authStatus, setAuthStatus] = useState<{status: 'pending'|'success'|'error', message?: string}>({
     status: 'pending'
   });
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [tableData, setTableData] = useState<any[] | null>(null);
+  const [loadingTableData, setLoadingTableData] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -78,6 +84,32 @@ export default function DatabaseApiInfo() {
     checkAuthStatus();
     fetchTables();
   }, []);
+
+  const fetchTableData = async (tableName: string) => {
+    setLoadingTableData(true);
+    setTableData(null);
+    setTableError(null);
+    setSelectedTable(tableName);
+
+    try {
+      const tableNameWithoutPrefix = tableName.replace('wp_hmm_', '');
+      const result = await fetchDatabaseTable(tableNameWithoutPrefix, { suppressToast: true });
+      if (result && result.data && Array.isArray(result.data)) {
+        setTableData(result.data.slice(0, 5)); // Show only first 5 items
+      } else {
+        setTableData([]);
+      }
+    } catch (err) {
+      console.error(`Error fetching data from table ${tableName}:`, err);
+      let errorMessage = `Không thể truy xuất dữ liệu từ bảng ${tableName}.`;
+      if (err instanceof Error) {
+        errorMessage += ' ' + err.message;
+      }
+      setTableError(errorMessage);
+    } finally {
+      setLoadingTableData(false);
+    }
+  };
 
   return (
     <Card>
@@ -150,17 +182,12 @@ export default function DatabaseApiInfo() {
               <TableRow>
                 <TableCell className="font-mono">/hmm/v1/tables/{'{table_name}'}</TableCell>
                 <TableCell>GET</TableCell>
-                <TableCell>Lấy cấu trúc của bảng cụ thể</TableCell>
+                <TableCell>Lấy cấu trúc và dữ liệu của bảng cụ thể</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-mono">/hmm/v1/query</TableCell>
                 <TableCell>POST</TableCell>
                 <TableCell>Thực hiện truy vấn SQL (chỉ SELECT)</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-mono">/hmm/v1/tables</TableCell>
-                <TableCell>POST</TableCell>
-                <TableCell>Tạo bảng mới</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -193,12 +220,13 @@ export default function DatabaseApiInfo() {
                 <TableRow>
                   <TableHead>Tên bảng</TableHead>
                   <TableHead>Số dòng</TableHead>
+                  <TableHead>Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tables.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={2} className="text-center">
+                    <TableCell colSpan={3} className="text-center">
                       Không tìm thấy bảng nào
                     </TableCell>
                   </TableRow>
@@ -207,11 +235,63 @@ export default function DatabaseApiInfo() {
                     <TableRow key={table.table_name}>
                       <TableCell className="font-mono">{table.table_name}</TableCell>
                       <TableCell>{table.row_count}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => fetchTableData(table.table_name)}
+                          disabled={loadingTableData && selectedTable === table.table_name}
+                        >
+                          <Database className="h-4 w-4 mr-2" />
+                          Xem dữ liệu
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
+
+            {selectedTable && (
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-2">
+                  Dữ liệu từ bảng <span className="font-mono">{selectedTable}</span>
+                </h3>
+                
+                {loadingTableData ? (
+                  <div className="flex justify-center py-4">Đang tải dữ liệu...</div>
+                ) : tableError ? (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{tableError}</AlertDescription>
+                  </Alert>
+                ) : tableData && tableData.length > 0 ? (
+                  <div className="rounded-md border overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {Object.keys(tableData[0]).map(key => (
+                            <TableHead key={key}>{key}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tableData.map((row, index) => (
+                          <TableRow key={index}>
+                            {Object.values(row).map((value: any, i) => (
+                              <TableCell key={i}>{value === null ? 'NULL' : String(value)}</TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {tableData.length > 0 && <div className="p-2 text-center text-sm text-muted-foreground">Hiển thị 5 dòng đầu tiên</div>}
+                  </div>
+                ) : (
+                  <div className="flex justify-center py-4 border rounded-md">Không có dữ liệu trong bảng</div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

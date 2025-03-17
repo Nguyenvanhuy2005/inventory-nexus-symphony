@@ -1,8 +1,7 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { checkAPIStatus } from "@/lib/api-utils";
 import { checkWooCommerceAuth, checkDatabaseApiAuth, initializeDefaultCredentials } from "@/lib/auth-utils";
-import { fetchWooCommerce, fetchCustomAPI } from "@/lib/api-utils";
+import { fetchWooCommerce, fetchCustomAPI, fetchDatabaseTable, executeDatabaseQuery } from "@/lib/api-utils";
 import { toast } from "sonner";
 import { PaymentReceipt, Product, ProductVariation, ProductWithVariations, StockTransaction, Supplier } from "@/types/models";
 import { mockSuppliers } from "@/lib/mock-data-suppliers";
@@ -278,16 +277,42 @@ export function useCreateStockAdjustment() {
 }
 
 /**
- * Hook to get all suppliers
+ * Hook to get all suppliers from the database directly
  */
 export function useGetSuppliers() {
   return useQuery<Supplier[], Error>({
     queryKey: ['suppliers'],
     queryFn: async () => {
       try {
-        console.log("Fetching suppliers from API...");
-        const data = await fetchCustomAPI('/suppliers');
-        return data as Supplier[];
+        console.log("Fetching suppliers from Database API...");
+        // First try to get data from the database API directly
+        const data = await fetchDatabaseTable('suppliers', { suppressToast: false });
+        
+        if (data && Array.isArray(data.data)) {
+          // Transform the raw database data to match our Supplier interface
+          return data.data.map(item => ({
+            id: parseInt(item.id),
+            name: item.name,
+            email: item.email,
+            phone: item.phone,
+            address: item.address,
+            contact_name: item.contact_name,
+            notes: item.notes,
+            payment_terms: item.payment_terms,
+            tax_id: item.tax_id,
+            status: (item.status as 'active' | 'inactive') || 'active',
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            initial_debt: parseFloat(item.initial_debt || '0'),
+            current_debt: parseFloat(item.current_debt || '0'),
+            total_debt: parseFloat(item.total_debt || '0')
+          }));
+        }
+        
+        // Fallback to custom API
+        console.log("Falling back to custom API...");
+        const customApiData = await fetchCustomAPI('/suppliers');
+        return customApiData as Supplier[];
       } catch (error) {
         console.error('Error fetching suppliers:', error);
         console.log("Falling back to mock data");
@@ -306,15 +331,41 @@ export function useCreateSupplier() {
   return useMutation({
     mutationFn: async (data: any) => {
       try {
-        const response = await fetchCustomAPI('/suppliers', {
-          method: 'POST',
-          body: data
-        });
-        return response;
+        // Try to insert directly into the database
+        const query = `
+          INSERT INTO wp_hmm_suppliers 
+          (name, contact_name, phone, email, address, initial_debt, current_debt, total_debt, notes, status, created_at, updated_at) 
+          VALUES 
+          ('${data.name}', '${data.contact_name || ''}', '${data.phone || ''}', '${data.email || ''}', 
+           '${data.address || ''}', ${data.initial_debt || 0}, ${data.current_debt || 0}, ${data.total_debt || 0}, 
+           '${data.notes || ''}', '${data.status}', NOW(), NOW())
+        `;
+        
+        const result = await executeDatabaseQuery(query, { suppressToast: false });
+        toast.success('Đã tạo nhà cung cấp mới thành công');
+        
+        // Return the created supplier with ID
+        return { 
+          id: result.insert_id,
+          ...data,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
       } catch (error) {
-        console.error('Error creating supplier:', error);
-        toast.success('Đã tạo nhà cung cấp mới (chế độ thử nghiệm)');
-        return { id: Date.now(), ...data };
+        console.error('Error creating supplier in database:', error);
+        
+        // Fallback to custom API
+        try {
+          const response = await fetchCustomAPI('/suppliers', {
+            method: 'POST',
+            body: data
+          });
+          return response;
+        } catch (apiError) {
+          console.error('Error creating supplier via API:', apiError);
+          toast.success('Đã tạo nhà cung cấp mới (chế độ thử nghiệm)');
+          return { id: Date.now(), ...data };
+        }
       }
     },
     onSuccess: () => {
@@ -332,15 +383,46 @@ export function useUpdateSupplier() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       try {
-        const response = await fetchCustomAPI(`/suppliers/${id}`, {
-          method: 'PUT',
-          body: data
-        });
-        return response;
-      } catch (error) {
-        console.error(`Error updating supplier ${id}:`, error);
-        toast.success('Đã cập nhật nhà cung cấp (chế độ thử nghiệm)');
+        // Try to update directly in the database
+        let setClause = Object.entries(data)
+          .filter(([key, _]) => key !== 'id') // Exclude ID from the SET clause
+          .map(([key, value]) => {
+            if (typeof value === 'string') {
+              return `${key} = '${value.replace(/'/g, "\\'")}'`; // Escape single quotes
+            } else {
+              return `${key} = ${value}`;
+            }
+          })
+          .join(', ');
+        
+        setClause += `, updated_at = NOW()`;
+        
+        const query = `
+          UPDATE wp_hmm_suppliers 
+          SET ${setClause}
+          WHERE id = ${id}
+        `;
+        
+        await executeDatabaseQuery(query, { suppressToast: false });
+        toast.success('Đã cập nhật nhà cung cấp thành công');
+        
+        // Return the updated supplier
         return { id, ...data };
+      } catch (error) {
+        console.error(`Error updating supplier ${id} in database:`, error);
+        
+        // Fallback to custom API
+        try {
+          const response = await fetchCustomAPI(`/suppliers/${id}`, {
+            method: 'PUT',
+            body: data
+          });
+          return response;
+        } catch (apiError) {
+          console.error(`Error updating supplier ${id} via API:`, apiError);
+          toast.success('Đã cập nhật nhà cung cấp (chế độ thử nghiệm)');
+          return { id, ...data };
+        }
       }
     },
     onSuccess: () => {
@@ -358,14 +440,26 @@ export function useDeleteSupplier() {
   return useMutation({
     mutationFn: async (id: number) => {
       try {
-        const response = await fetchCustomAPI(`/suppliers/${id}`, {
-          method: 'DELETE'
-        });
-        return response;
-      } catch (error) {
-        console.error(`Error deleting supplier ${id}:`, error);
-        toast.success('Đã xóa nhà cung cấp (chế độ thử nghiệm)');
+        // Try to delete directly from the database
+        const query = `DELETE FROM wp_hmm_suppliers WHERE id = ${id}`;
+        await executeDatabaseQuery(query, { suppressToast: false });
+        toast.success('Đã xóa nhà cung cấp thành công');
+        
         return { success: true };
+      } catch (error) {
+        console.error(`Error deleting supplier ${id} from database:`, error);
+        
+        // Fallback to custom API
+        try {
+          const response = await fetchCustomAPI(`/suppliers/${id}`, {
+            method: 'DELETE'
+          });
+          return response;
+        } catch (apiError) {
+          console.error(`Error deleting supplier ${id} via API:`, apiError);
+          toast.success('Đã xóa nhà cung cấp (chế độ thử nghiệm)');
+          return { success: true };
+        }
       }
     },
     onSuccess: () => {
