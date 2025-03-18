@@ -39,7 +39,7 @@ export async function checkWooCommerceAuth(): Promise<boolean> {
 /**
  * Checks if Database API credentials are valid
  */
-export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean, error: string | null}> {
+export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean, error: string | null, version?: string | null, tables?: any[]}> {
   try {
     const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
     const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
@@ -48,7 +48,9 @@ export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean,
       console.error('Missing WordPress credentials');
       return {
         isAuthenticated: false,
-        error: 'Thiếu thông tin đăng nhập WordPress'
+        error: 'Thiếu thông tin đăng nhập WordPress',
+        version: null,
+        tables: []
       };
     }
     
@@ -57,11 +59,22 @@ export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean,
       passwordLength: password ? password.length : 0
     });
     
-    // Try to fetch the status endpoint to check authentication
-    await fetchCustomAPI('/hmm/v1/status', { suppressToast: true });
+    // Use the improved checkDatabaseApiAuth function from custom-api.ts
+    const result = await fetchCustomAPI('/hmm/v1/status', { 
+      suppressToast: true,
+      // Explicitly set headers to ensure authentication is correct
+      headers: {
+        'Authorization': `Basic ${btoa(`${username}:${password}`)}`
+      }
+    });
+    
+    console.log('Database API auth check succeeded with result:', result);
+    
     return {
       isAuthenticated: true,
-      error: null
+      error: null,
+      version: result?.version,
+      tables: result?.custom_tables || []
     };
   } catch (error) {
     console.error('Database API authentication failed:', error);
@@ -72,6 +85,8 @@ export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean,
         errorMessage = 'Lỗi xác thực (401): Thông tin xác thực không hợp lệ';
       } else if (error.message.includes('404')) {
         errorMessage = 'Lỗi 404: Endpoint không tồn tại, kiểm tra plugin HMM Database API';
+      } else if (error.message.includes('CORS')) {
+        errorMessage = 'Lỗi CORS: Máy chủ không chấp nhận kết nối từ origin này';
       } else {
         errorMessage = error.message;
       }
@@ -79,7 +94,9 @@ export async function checkDatabaseApiAuth(): Promise<{isAuthenticated: boolean,
     
     return {
       isAuthenticated: false,
-      error: errorMessage
+      error: errorMessage,
+      version: null,
+      tables: []
     };
   }
 }
@@ -108,7 +125,9 @@ export async function getAuthStatus() {
     },
     databaseApi: {
       isAuthenticated: databaseApiAuth.isAuthenticated,
-      error: databaseApiAuth.error
+      error: databaseApiAuth.error,
+      version: databaseApiAuth.version,
+      tables: databaseApiAuth.tables
     },
     status: {
       wordpress: {

@@ -1,11 +1,10 @@
 
 import { useQuery } from "@tanstack/react-query";
+import { checkDatabaseApiAuth } from "@/lib/api/custom-api";
 import { 
-  checkAPIStatus, 
   checkWooCommerceAuth, 
-  checkDatabaseApiAuth, 
   initializeDefaultCredentials 
-} from "@/lib/api";
+} from "@/lib/auth-utils";
 
 /**
  * Hook to check API connection status
@@ -18,12 +17,25 @@ export function useCheckAPIStatus() {
       // Ensure credentials are initialized
       initializeDefaultCredentials();
       
-      const apiStatus = await checkAPIStatus();
+      // Get WooCommerce authentication status
+      console.log('Checking WooCommerce API authentication...');
       const woocommerceStatus = await checkWooCommerceAuth();
+      
+      // Get Database API authentication status
+      console.log('Checking Database API authentication...');
       const databaseApiStatus = await checkDatabaseApiAuth();
       
+      // Determine WordPress connection status from Database API result
+      // If Database API is connected, WordPress must be connected too
+      const wpConnected = databaseApiStatus.isAuthenticated;
+      
+      console.log('API status check complete:', {
+        woocommerce: woocommerceStatus,
+        databaseApi: databaseApiStatus.isAuthenticated,
+        wordpress: wpConnected
+      });
+      
       return {
-        ...apiStatus,
         woocommerce: {
           isAuthenticated: woocommerceStatus,
           error: woocommerceStatus ? null : 'Không thể xác thực với WooCommerce API',
@@ -31,12 +43,14 @@ export function useCheckAPIStatus() {
         },
         databaseApi: {
           isAuthenticated: databaseApiStatus.isAuthenticated,
-          error: databaseApiStatus.error
+          error: databaseApiStatus.error,
+          version: databaseApiStatus.version,
+          tables: databaseApiStatus.tables || []
         },
-        status: apiStatus.status || {
+        status: {
           wordpress: {
-            connected: false,
-            message: "Not checked"
+            connected: wpConnected,
+            message: wpConnected ? 'Connected' : databaseApiStatus.error || 'Failed to connect'
           }
         }
       };
