@@ -2,7 +2,7 @@
 /**
  * Plugin Name: HMM Database API
  * Description: API để kết nối cơ sở dữ liệu WordPress với ứng dụng HMM Inventory
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: HMM
  */
 
@@ -22,19 +22,19 @@ class HMM_Database_API {
         // Tạo bảng khi kích hoạt plugin
         register_activation_hook(__FILE__, array($this, 'create_custom_tables'));
         
-        // Cho phép CORS từ bất kỳ origin nào - cải thiện đáng kể
+        // Cải thiện CORS cho tất cả REST API requests
         add_action('rest_api_init', function() {
             remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
             add_filter('rest_pre_serve_request', function($value) {
-                $origin = get_http_origin();
-                if ($origin) {
-                    header('Access-Control-Allow-Origin: ' . $origin);
+                if (isset($_SERVER['HTTP_ORIGIN'])) {
+                    // Cho phép tất cả các origins
+                    header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN']);
                 } else {
                     header('Access-Control-Allow-Origin: *');
                 }
                 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH');
                 header('Access-Control-Allow-Credentials: true');
-                header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization');
+                header('Access-Control-Allow-Headers: Authorization, Content-Type, Accept, Origin, X-Requested-With');
                 header('Access-Control-Expose-Headers: Link, X-WP-Total, X-WP-TotalPages', false);
                 
                 // Xử lý pre-flight requests
@@ -56,6 +56,12 @@ class HMM_Database_API {
             }
             return $endpoints;
         });
+        
+        // Hook trước khi gửi response để thêm debug headers nếu cần
+        add_filter('rest_pre_serve_request', array($this, 'add_debug_headers'), 10, 4);
+        
+        // Cải thiện authentication cho REST API
+        add_filter('determine_current_user', array($this, 'determine_current_user_from_token'), 20);
     }
     
     /**
@@ -64,59 +70,77 @@ class HMM_Database_API {
     public function register_api_routes() {
         // API endpoint để kiểm tra trạng thái
         register_rest_route('hmm/v1', '/status', array(
-            'methods' => 'GET',
+            'methods' => 'GET,OPTIONS',
             'callback' => array($this, 'get_status'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
         // API endpoint để lấy thông tin tất cả bảng
         register_rest_route('hmm/v1', '/tables', array(
-            'methods' => 'GET',
+            'methods' => 'GET,OPTIONS',
             'callback' => array($this, 'get_all_tables'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
         // API endpoint để lấy cấu trúc bảng
         register_rest_route('hmm/v1', '/tables/(?P<table_name>[a-zA-Z0-9_-]+)', array(
-            'methods' => 'GET',
+            'methods' => 'GET,OPTIONS',
             'callback' => array($this, 'get_table_structure'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
         // API endpoint để lấy dữ liệu từ bảng
         register_rest_route('hmm/v1', '/query', array(
-            'methods' => 'POST',
+            'methods' => 'POST,OPTIONS',
             'callback' => array($this, 'execute_query'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
         
         // API endpoint để tạo bảng mới
         register_rest_route('hmm/v1', '/tables', array(
-            'methods' => 'POST',
+            'methods' => 'POST,OPTIONS',
             'callback' => array($this, 'create_table'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
 
         // API endpoint để thêm dữ liệu mới vào bảng
         register_rest_route('hmm/v1', '/tables/(?P<table_name>[a-zA-Z0-9_-]+)/insert', array(
-            'methods' => 'POST',
+            'methods' => 'POST,OPTIONS',
             'callback' => array($this, 'insert_record'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
 
         // API endpoint để cập nhật dữ liệu trong bảng
         register_rest_route('hmm/v1', '/tables/(?P<table_name>[a-zA-Z0-9_-]+)/update/(?P<id>\d+)', array(
-            'methods' => 'PUT',
+            'methods' => 'PUT,OPTIONS',
             'callback' => array($this, 'update_record'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
 
         // API endpoint để xóa dữ liệu từ bảng
         register_rest_route('hmm/v1', '/tables/(?P<table_name>[a-zA-Z0-9_-]+)/delete/(?P<id>\d+)', array(
-            'methods' => 'DELETE',
+            'methods' => 'DELETE,OPTIONS',
             'callback' => array($this, 'delete_record'),
             'permission_callback' => array($this, 'api_permissions_check'),
         ));
+    }
+    
+    /**
+     * Thêm debug headers vào REST API response nếu cần
+     */
+    public function add_debug_headers($served, $result, $request, $server) {
+        // Thêm các header để debug
+        header('X-HMM-Database-API: v1.0.4');
+        
+        // Thêm thông tin về người dùng hiện tại
+        $current_user_id = get_current_user_id();
+        if ($current_user_id) {
+            header('X-HMM-User-ID: ' . $current_user_id);
+        } else {
+            header('X-HMM-User-ID: None');
+        }
+        
+        return $served;
     }
     
     /**
@@ -130,8 +154,17 @@ class HMM_Database_API {
         }
         
         // Nếu người dùng đã đăng nhập, kiểm tra quyền
-        if (is_user_logged_in() && current_user_can('manage_options')) {
-            return true;
+        if (is_user_logged_in()) {
+            $user_id = get_current_user_id();
+            $user = get_userdata($user_id);
+            
+            // Log user info for debugging
+            error_log("User ID: $user_id, User roles: " . implode(', ', $user->roles));
+            
+            // Cho phép bất kỳ ai có quyền edit_posts hoặc manage_options
+            if (user_can($user_id, 'edit_posts') || user_can($user_id, 'manage_options')) {
+                return true;
+            }
         }
         
         // Kiểm tra xác thực bằng Application Password
@@ -146,6 +179,9 @@ class HMM_Database_API {
             $auth_data = base64_decode($matches[1]);
             list($username, $password) = explode(':', $auth_data, 2);
             
+            // Log auth info for debugging (mask password for security)
+            error_log("Auth attempt: Username: $username, Password length: " . strlen($password));
+            
             // Lấy user từ tên người dùng
             $user = get_user_by('login', $username);
             
@@ -155,20 +191,68 @@ class HMM_Database_API {
             
             // Kiểm tra mật khẩu thông thường
             if (wp_check_password($password, $user->user_pass, $user->ID)) {
-                return user_can($user, 'manage_options');
+                // Grant access even if the user doesn't have manage_options
+                // but has edit_posts capability
+                return user_can($user, 'edit_posts') || user_can($user, 'manage_options');
             } else {
                 // Kiểm tra Application Password
                 require_once ABSPATH . 'wp-includes/class-wp-application-passwords.php';
                 if (class_exists('WP_Application_Passwords')) {
-                    $app_password = WP_Application_Passwords::check_application_password($user->ID, $password);
+                    $app_password = WP_Application_Passwords::check_application_password($user, $password);
                     if ($app_password && !is_wp_error($app_password)) {
-                        return user_can($user, 'manage_options');
+                        // Grant access even if the user doesn't have manage_options
+                        // but has edit_posts capability
+                        return user_can($user, 'edit_posts') || user_can($user, 'manage_options');
                     }
                 }
             }
         }
         
         return new WP_Error('rest_forbidden', 'Xác thực không thành công.', array('status' => 401));
+    }
+    
+    /**
+     * Xác định người dùng hiện tại từ token xác thực
+     */
+    public function determine_current_user_from_token($user_id) {
+        if ($user_id) {
+            return $user_id;
+        }
+        
+        $auth_header = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : false;
+        
+        if (!$auth_header) {
+            return $user_id;
+        }
+        
+        // Lấy thông tin xác thực từ header
+        if (preg_match('/Basic\s+(.*)$/i', $auth_header, $matches)) {
+            $auth_data = base64_decode($matches[1]);
+            list($username, $password) = explode(':', $auth_data, 2);
+            
+            // Lấy user từ tên người dùng
+            $user = get_user_by('login', $username);
+            
+            if (!$user) {
+                return $user_id;
+            }
+            
+            // Kiểm tra mật khẩu thông thường
+            if (wp_check_password($password, $user->user_pass, $user->ID)) {
+                return $user->ID;
+            } else {
+                // Kiểm tra Application Password
+                require_once ABSPATH . 'wp-includes/class-wp-application-passwords.php';
+                if (class_exists('WP_Application_Passwords')) {
+                    $app_password = WP_Application_Passwords::check_application_password($user, $password);
+                    if ($app_password && !is_wp_error($app_password)) {
+                        return $user->ID;
+                    }
+                }
+            }
+        }
+        
+        return $user_id;
     }
     
     /**
@@ -179,15 +263,49 @@ class HMM_Database_API {
         
         $tables = $this->get_custom_tables();
         
+        // Add request info for debugging
+        $request_info = array(
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'Unknown',
+            'origin' => isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : 'Unknown',
+            'remote_addr' => isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'Unknown',
+            'authenticated' => is_user_logged_in() ? 'Yes' : 'No',
+            'user_id' => get_current_user_id(),
+        );
+        
+        // Kiểm tra quyền REST API
+        $current_user_id = get_current_user_id();
+        $user_roles = array();
+        $user_capabilities = array();
+        
+        if ($current_user_id) {
+            $user = get_userdata($current_user_id);
+            if ($user) {
+                $user_roles = $user->roles;
+                foreach ($user->allcaps as $cap => $allowed) {
+                    if ($allowed) {
+                        $user_capabilities[] = $cap;
+                    }
+                }
+            }
+        }
+        
         return array(
             'status' => 'active',
-            'version' => '1.0.3',
+            'version' => '1.0.4',
             'wordpress_version' => get_bloginfo('version'),
             'database_prefix' => $wpdb->prefix,
             'custom_tables' => $tables,
             'write_support' => true,
             'cors_support' => true,
-            'timestamp' => current_time('mysql')
+            'timestamp' => current_time('mysql'),
+            'user' => array(
+                'id' => $current_user_id,
+                'roles' => $user_roles,
+                'has_edit_posts' => user_can($current_user_id, 'edit_posts'),
+                'has_manage_options' => user_can($current_user_id, 'manage_options'),
+                'capabilities' => array_slice($user_capabilities, 0, 10) // Limit to first 10 capabilities
+            ),
+            'request' => $request_info
         );
     }
     
@@ -369,7 +487,7 @@ class HMM_Database_API {
         dbDelta($sql);
         
         // Lưu version của database để kiểm tra cập nhật sau này
-        add_option('hmm_database_version', '1.0.3');
+        add_option('hmm_database_version', '1.0.4');
     }
     
     /**

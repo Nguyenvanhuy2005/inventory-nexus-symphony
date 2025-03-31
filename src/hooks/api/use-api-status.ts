@@ -57,12 +57,13 @@ export function useCheckAPIStatus() {
     },
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    retry: 1
+    retry: 1,
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 }
 
 /**
- * Helper function to reset API cache and credentials
+ * Helper function to reset API connection and clear cache
  */
 export function resetApiConnection(newDomain?: string) {
   const queryClient = useQueryClient();

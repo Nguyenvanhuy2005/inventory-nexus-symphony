@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { API_BASE_URL } from "./base-api";
 import { DEFAULT_WORDPRESS_CREDENTIALS } from "../auth-utils";
@@ -12,38 +11,109 @@ import { mockWooCommerceData } from "./mock-data";
  */
 export async function fetchWordPress(endpoint: string, options: any = {}) {
   try {
-    const fetchOptions = {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      ...options
-    };
-
     // Get authentication credentials from localStorage or defaults
     const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
     const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
 
+    // Prepare authentication headers
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...options.headers
+    });
+    
     // Add header Basic Authentication
-    fetchOptions.headers['Authorization'] = 'Basic ' + btoa(`${username}:${password}`);
+    const authToken = btoa(`${username}:${password}`);
+    headers.set('Authorization', `Basic ${authToken}`);
+
+    const fetchOptions: RequestInit = {
+      method: options.method || 'GET',
+      headers: headers,
+      credentials: 'include',
+      mode: 'cors',
+      ...options
+    };
 
     // If there's a body, stringify it
-    if (options.body && typeof options.body === 'object') {
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
       fetchOptions.body = JSON.stringify(options.body);
     }
 
     const url = `${API_BASE_URL}/wp/v2${endpoint}`;
-    console.info(`Fetching WordPress API: ${endpoint}`);
+    console.info(`Fetching WordPress API: ${endpoint}`, {
+      url,
+      method: fetchOptions.method || 'GET',
+      hasAuth: true
+    });
 
-    const response = await fetch(url, fetchOptions);
+    try {
+      // Implement fetch with timeout for better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+      
+      fetchOptions.signal = controller.signal;
+      
+      const response = await fetch(url, fetchOptions);
+      clearTimeout(timeoutId);
+      
+      console.log('WordPress API Response received:', {
+        endpoint,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
+      if (!response.ok) {
+        // Get response text for better error messages
+        let errorText = await response.text();
+        try {
+          // Try to parse as JSON for structured error messages
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.message) {
+            errorText = errorJson.message;
+          } else if (errorJson.error) {
+            errorText = errorJson.error;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+        
+        console.error(`WordPress API request failed (${response.status}):`, errorText);
+        
+        // Handle specific error codes
+        if (response.status === 401) {
+          throw new Error(`Lỗi xác thực WordPress: Thông tin đăng nhập không chính xác hoặc không đủ quyền (${response.status})`);
+        } else if (response.status === 404) {
+          throw new Error(`WordPress endpoint không tồn tại (${response.status})`);
+        } else if (response.status === 403) {
+          throw new Error(`Bạn không có quyền truy cập WordPress API này (${response.status})`);
+        }
+        
+        throw new Error(`WordPress API request failed: ${response.status} - ${errorText}`);
+      }
 
-    if (!response.ok) {
-      throw new Error(`WordPress API request failed: ${response.status}`);
+      const data = await response.json();
+      console.info(`WordPress API response data for ${endpoint}:`, data);
+      return data;
+      
+    } catch (error) {
+      // Handle fetch errors with more detailed info
+      console.error(`Fetch error for WordPress API ${endpoint}:`, error);
+      
+      // Check if it's a timeout
+      if (error.name === 'AbortError') {
+        throw new Error(`Kết nối đến WordPress API đã hết thời gian chờ. Vui lòng kiểm tra mạng của bạn hoặc thử lại sau.`);
+      }
+      
+      // Check if it's a CORS error
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('This might be a CORS issue. Check CORS configuration on the server.');
+        throw new Error(`Kết nối đến WordPress API thất bại. Có thể do lỗi CORS hoặc server không chấp nhận kết nối từ origin này.`);
+      }
+      
+      // Rethrow the error for further handling
+      throw error;
     }
-
-    const data = await response.json();
-    return data;
   } catch (error) {
     console.error(`Error fetching from WordPress API (${endpoint}):`, error);
 
@@ -83,14 +153,30 @@ export async function uploadAttachment(file: File) {
       'Authorization': 'Basic ' + btoa(`${username}:${password}`)
     };
     
+    // Implement fetch with timeout for better error handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for uploads
+    
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
     
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
-      throw new Error(`File upload failed: ${response.status}`);
+      let errorText = await response.text();
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message) {
+          errorText = errorJson.message;
+        }
+      } catch (e) {
+        // Not JSON, keep as is
+      }
+      throw new Error(`File upload failed: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();

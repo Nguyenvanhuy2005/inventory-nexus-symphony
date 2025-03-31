@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { toast } from "sonner";
 import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ApiEndpoints = {
   wordpress: [
@@ -34,6 +34,8 @@ const ApiEndpoints = {
 
 export default function ApiConnectionTester() {
   const [testing, setTesting] = useState(false);
+  const [forceClearingCache, setForceClearingCache] = useState(false);
+  const queryClient = useQueryClient();
   const [results, setResults] = useState<{
     wordpress: { success: boolean; message: string; error?: string }[];
     woocommerce: { success: boolean; message: string; error?: string }[];
@@ -46,7 +48,7 @@ export default function ApiConnectionTester() {
     databaseApiCrud: []
   });
 
-  const testApiConnections = async () => {
+  const testApiConnections = async (useCache = true) => {
     setTesting(true);
     const wordpressResults = [];
     const woocommerceResults = [];
@@ -57,7 +59,8 @@ export default function ApiConnectionTester() {
       // Test WordPress endpoints
       for (const endpoint of ApiEndpoints.wordpress) {
         try {
-          await fetchWordPress(endpoint.path, { suppressToast: true });
+          const cacheParam = !useCache ? `?_=${Date.now()}` : '';
+          await fetchWordPress(endpoint.path + cacheParam, { suppressToast: true });
           wordpressResults.push({
             success: true,
             message: `${endpoint.name}: Kết nối thành công`
@@ -75,7 +78,8 @@ export default function ApiConnectionTester() {
       // Test WooCommerce endpoints
       for (const endpoint of ApiEndpoints.woocommerce) {
         try {
-          await fetchWooCommerce(endpoint.path, { suppressToast: true });
+          const cacheParam = !useCache ? `?_=${Date.now()}` : '';
+          await fetchWooCommerce(endpoint.path + cacheParam, { suppressToast: true });
           woocommerceResults.push({
             success: true,
             message: `${endpoint.name}: Kết nối thành công`
@@ -94,13 +98,15 @@ export default function ApiConnectionTester() {
       for (const endpoint of ApiEndpoints.databaseApi) {
         try {
           if (endpoint.method === "GET") {
-            await fetchCustomAPI(endpoint.path, { suppressToast: true });
+            const cacheParam = !useCache ? `?_=${Date.now()}` : '';
+            await fetchCustomAPI(endpoint.path + cacheParam, { suppressToast: true });
           } else {
             // For POST endpoints, send a minimal test payload
             await fetchCustomAPI(endpoint.path, { 
               method: "POST", 
               body: { query: "SELECT 1" },
-              suppressToast: true 
+              suppressToast: true,
+              cache: useCache ? 'default' : 'no-cache'
             });
           }
           
@@ -114,9 +120,11 @@ export default function ApiConnectionTester() {
           if (error instanceof Error) {
             // Enhance error messages for common issues
             if (error.message.includes('401')) {
-              errorMessage = "Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ";
+              errorMessage = "Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ hoặc thiếu quyền";
             } else if (error.message.includes('404')) {
               errorMessage = "Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt";
+            } else if (error.message.includes('403')) {
+              errorMessage = "Lỗi 403: Không đủ quyền truy cập";
             } else {
               errorMessage = error.message;
             }
@@ -136,8 +144,11 @@ export default function ApiConnectionTester() {
           // Just check if the endpoint exists, don't actually modify data
           if (endpoint.method === "POST") {
             // For insert, we just check OPTIONS to see if the endpoint responds
-            const response = await fetch(`${window.location.origin}/wp-json${endpoint.path}`, {
-              method: 'OPTIONS'
+            const cacheParam = !useCache ? `?_=${Date.now()}` : '';
+            const url = `${API_BASE_URL}${endpoint.path}${cacheParam}`;
+            const response = await fetch(url, {
+              method: 'OPTIONS',
+              cache: useCache ? 'default' : 'no-cache'
             });
             
             if (response.ok || response.status === 401) {
@@ -153,8 +164,11 @@ export default function ApiConnectionTester() {
           else if (endpoint.method === "PUT" || endpoint.method === "DELETE") {
             // For update/delete, we'll assume the endpoint exists if OPTIONS returns a response
             // or if we get an auth error (which means the endpoint exists)
-            const response = await fetch(`${window.location.origin}/wp-json${endpoint.path}`, {
-              method: 'OPTIONS'
+            const cacheParam = !useCache ? `?_=${Date.now()}` : '';
+            const url = `${API_BASE_URL}${endpoint.path}${cacheParam}`;
+            const response = await fetch(url, {
+              method: 'OPTIONS',
+              cache: useCache ? 'default' : 'no-cache'
             });
             
             if (response.ok || response.status === 401 || response.status === 404) {
@@ -199,6 +213,25 @@ export default function ApiConnectionTester() {
       console.error("API connection test error:", error);
     } finally {
       setTesting(false);
+    }
+  };
+
+  const forceRefreshCache = async () => {
+    try {
+      setForceClearingCache(true);
+      
+      // Clear all query cache
+      queryClient.clear();
+      
+      // Clear browser cache for API calls
+      await testApiConnections(false); // Pass false to disable cache
+      
+      toast.success("Đã xóa cache và làm mới kết nối API thành công");
+    } catch (error) {
+      toast.error("Lỗi khi làm mới kết nối API");
+      console.error("Error during force refresh:", error);
+    } finally {
+      setForceClearingCache(false);
     }
   };
 
@@ -281,8 +314,6 @@ export default function ApiConnectionTester() {
         <CardTitle>Kiểm tra kết nối API</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {renderEndpointsTable()}
-        
         {results.wordpress.length === 0 && results.woocommerce.length === 0 && 
          results.databaseApi.length === 0 && results.databaseApiCrud.length === 0 && (
           <div className="text-center py-6 text-muted-foreground">
@@ -351,8 +382,8 @@ export default function ApiConnectionTester() {
           </Alert>
         )}
       </CardContent>
-      <CardFooter>
-        <Button onClick={testApiConnections} disabled={testing} className="w-full">
+      <CardFooter className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+        <Button onClick={() => testApiConnections()} disabled={testing || forceClearingCache} className="w-full">
           {testing ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -360,6 +391,21 @@ export default function ApiConnectionTester() {
             </>
           ) : (
             "Kiểm tra kết nối API"
+          )}
+        </Button>
+        <Button 
+          onClick={forceRefreshCache} 
+          variant="outline" 
+          disabled={testing || forceClearingCache} 
+          className="w-full"
+        >
+          {forceClearingCache ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Đang làm mới...
+            </>
+          ) : (
+            "Làm mới hoàn toàn (xóa cache)"
           )}
         </Button>
       </CardFooter>

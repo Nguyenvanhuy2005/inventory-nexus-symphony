@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { API_BASE_URL } from "./base-api";
 import { DEFAULT_WORDPRESS_CREDENTIALS } from "../auth-utils";
@@ -83,7 +82,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     try {
       // Implement fetch with timeout for better error handling
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased from 15)
       
       fetchOptions.signal = controller.signal;
       
@@ -98,8 +97,31 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
+        // Get response text for better error messages
+        let errorText = await response.text();
+        try {
+          // Try to parse as JSON for structured error messages
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.message) {
+            errorText = errorJson.message;
+          } else if (errorJson.error) {
+            errorText = errorJson.error;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+        
         console.error(`API request failed (${response.status}):`, errorText);
+        
+        // Handle specific error codes
+        if (response.status === 401) {
+          throw new Error(`Lỗi xác thực: Thông tin đăng nhập không chính xác hoặc không đủ quyền (${response.status})`);
+        } else if (response.status === 404) {
+          throw new Error(`Endpoint không tồn tại hoặc chưa được kích hoạt (${response.status})`);
+        } else if (response.status === 403) {
+          throw new Error(`Bạn không có quyền truy cập API này (${response.status})`);
+        }
+        
         throw new Error(`API request failed: ${response.status} - ${errorText}`);
       }
       
@@ -167,27 +189,30 @@ export async function checkDatabaseApiAuth() {
       authTokenStart: authToken.substring(0, 10) + '...'
     });
     
-    // Try to connect directly to the status endpoint
-    const headers = new Headers({
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Basic ${authToken}`
-    });
-    
+    // Try a direct fetch with explicit CORS settings instead of using fetchCustomAPI
     const url = `${API_BASE_URL}/hmm/v1/status`;
     console.log('Checking Database API connection with URL:', url);
     
     try {
+      // Set explicit CORS headers in request
+      const headers = new Headers({
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Basic ${authToken}`
+      });
+      
       // Implement fetch with timeout for better error handling
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased from 15)
       
       const response = await fetch(url, {
         method: 'GET',
         headers: headers,
         credentials: 'include',
         mode: 'cors',
-        signal: controller.signal
+        signal: controller.signal,
+        // Add cache-busting parameter to avoid cached responses
+        cache: 'no-cache'
       });
       
       clearTimeout(timeoutId);
@@ -199,20 +224,40 @@ export async function checkDatabaseApiAuth() {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
+        // Get response text for better error messages
+        let errorText = await response.text();
+        try {
+          // Try to parse as JSON for structured error messages
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.message) {
+            errorText = errorJson.message;
+          } else if (errorJson.error) {
+            errorText = errorJson.error;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+        
         console.error(`Database API auth check failed (${response.status}):`, errorText);
         
         if (response.status === 401) {
           return {
             isAuthenticated: false,
-            error: 'Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ',
+            error: 'Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ hoặc thiếu quyền truy cập',
             version: null,
             tables: []
           };
         } else if (response.status === 404) {
           return {
             isAuthenticated: false,
-            error: 'Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt',
+            error: 'Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt hoặc endpoint sai',
+            version: null,
+            tables: []
+          };
+        } else if (response.status === 403) {
+          return {
+            isAuthenticated: false,
+            error: 'Lỗi 403: Không đủ quyền truy cập API này',
             version: null,
             tables: []
           };
