@@ -2,11 +2,11 @@
 <?php
 /**
  * Plugin Name: HMM Core API
- * Plugin URI: https://hmm.vn
+ * Plugin URI: https://hcm.sithethao.com
  * Description: Plugin tổng hợp các API endpoints cho ứng dụng HMM Inventory (Database, Media, Custom API)
  * Version: 1.0.0
  * Author: HMM Team
- * Author URI: https://hmm.vn
+ * Author URI: https://hcm.sithethao.com
  * Text Domain: hmm-core-api
  */
 
@@ -470,3 +470,4 @@ class HMM_Core_API {
 
 // Initialize plugin
 $hmm_core_api = new HMM_Core_API();
+
