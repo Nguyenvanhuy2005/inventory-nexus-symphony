@@ -1,20 +1,19 @@
-
 import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from './api';
 
 /**
  * Default WooCommerce credentials - These will be used if not overridden by localStorage
  */
 export const DEFAULT_WOOCOMMERCE_CREDENTIALS = {
-  consumer_key: 'ck_e34b9aa04c2d08378d4f0976773454e528b70e50',
-  consumer_secret: 'cs_ed12b7fc28e091502f6eddf689967134d81ad13f'
+  consumer_key: 'ck_7935a07888db15201ea09300934d277d69064c33',
+  consumer_secret: 'cs_27bd2111e8402f827a7261707125929171061a2d'
 };
 
 /**
  * Default WordPress credentials
  */
 export const DEFAULT_WORDPRESS_CREDENTIALS = {
-  username: 'admin',
-  application_password: 'ISJu eeS5 CMg5 fh64 jtaW 76ng'
+  username: 'Sithethao',
+  application_password: 'LDUe HXkt Le1k ZmJT tkmL OVHs'
 };
 
 /**
@@ -160,11 +159,22 @@ export function initializeDefaultCredentials() {
     localStorage.setItem('wordpress_application_password', DEFAULT_WORDPRESS_CREDENTIALS.application_password);
   }
   
-  console.log('API credentials initialized:',  {
+  // Initialize API URL if not set
+  if (!localStorage.getItem('api_url')) {
+    localStorage.setItem('api_url', 'https://hcm.sithethao.com/wp-json');
+  }
+  
+  if (!localStorage.getItem('woocommerce_api_url')) {
+    localStorage.setItem('woocommerce_api_url', 'https://hcm.sithethao.com/wp-json/wc/v3');
+  }
+  
+  console.log('API credentials initialized:', {
     woo_key: localStorage.getItem('woocommerce_consumer_key'),
     woo_secret: localStorage.getItem('woocommerce_consumer_secret')?.substring(0, 5) + '...',
     wp_username: localStorage.getItem('wordpress_username'),
-    wp_password_length: localStorage.getItem('wordpress_application_password')?.length || 0
+    wp_password_length: localStorage.getItem('wordpress_application_password')?.length || 0,
+    api_url: localStorage.getItem('api_url'),
+    woocommerce_api_url: localStorage.getItem('woocommerce_api_url')
   });
 }
 

@@ -1,5 +1,5 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { checkDatabaseApiAuth } from "@/lib/api/custom-api";
 import { 
   checkWooCommerceAuth, 
@@ -59,4 +59,31 @@ export function useCheckAPIStatus() {
     refetchInterval: false,
     retry: 1
   });
+}
+
+/**
+ * Helper function to reset API cache and credentials
+ */
+export function resetApiConnection(newDomain?: string) {
+  const queryClient = useQueryClient();
+  
+  // Update domain if provided
+  if (newDomain) {
+    localStorage.setItem('api_url', `https://${newDomain}/wp-json`);
+    localStorage.setItem('woocommerce_api_url', `https://${newDomain}/wp-json/wc/v3`);
+  }
+  
+  // Clear API-related cache
+  queryClient.invalidateQueries({ queryKey: ['api-status'] });
+  queryClient.invalidateQueries({ queryKey: ['customers'] });
+  queryClient.invalidateQueries({ queryKey: ['products'] });
+  queryClient.invalidateQueries({ queryKey: ['orders'] });
+  queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+  
+  console.log('API connection reset:', {
+    api_url: localStorage.getItem('api_url'),
+    woocommerce_api_url: localStorage.getItem('woocommerce_api_url')
+  });
+  
+  return true;
 }

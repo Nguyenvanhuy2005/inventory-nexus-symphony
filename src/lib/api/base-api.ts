@@ -1,18 +1,17 @@
-
 import { toast } from "sonner";
 import { initializeDefaultCredentials } from "../auth-utils";
 
 // API base URLs with fallbacks that will work in browser environment
-export const API_BASE_URL = import.meta.env.VITE_API_URL || localStorage.getItem('api_url') || 'https://hmm.vn/wp-json';
-export const WOOCOMMERCE_API_URL = import.meta.env.VITE_WOOCOMMERCE_API_URL || localStorage.getItem('woocommerce_api_url') || 'https://hmm.vn/wp-json/wc/v3';
+export const API_BASE_URL = localStorage.getItem('api_url') || import.meta.env.VITE_API_URL || 'https://hcm.sithethao.com/wp-json';
+export const WOOCOMMERCE_API_URL = localStorage.getItem('woocommerce_api_url') || import.meta.env.VITE_WOOCOMMERCE_API_URL || 'https://hcm.sithethao.com/wp-json/wc/v3';
 
 // WooCommerce authentication keys from environment or localStorage
 export function getConsumerKey() {
-  return import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY || localStorage.getItem('woocommerce_consumer_key') || '';
+  return localStorage.getItem('woocommerce_consumer_key') || import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY || '';
 }
 
 export function getConsumerSecret() {
-  return import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET || localStorage.getItem('woocommerce_consumer_secret') || '';
+  return localStorage.getItem('woocommerce_consumer_secret') || import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET || '';
 }
 
 /**
