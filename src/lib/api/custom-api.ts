@@ -29,19 +29,19 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       ...options.headers
     });
     
-    // Add Basic Auth for all API calls (including Database API)
+    // Add Basic Auth for all API calls (including HMM Core API)
     const authToken = btoa(`${username}:${password}`);
     headers.set('Authorization', `Basic ${authToken}`);
     
-    // Check if this is a Database API call (starts with /hmm/v1)
-    const isDatabaseApiCall = endpoint.startsWith('/hmm/v1');
+    // Check if this is a HMM API call (starts with /hmm/v1)
+    const isHmmApiCall = endpoint.startsWith('/hmm/v1');
     
-    // For Database API calls, use the direct endpoint without the 'custom/v1' prefix
-    const url = isDatabaseApiCall 
+    // For HMM API calls, use the direct endpoint without the 'custom/v1' prefix
+    const url = isHmmApiCall 
       ? `${API_BASE_URL}${endpoint}`
       : `${API_BASE_URL}/custom/v1${endpoint}`;
       
-    console.info(`Fetching ${isDatabaseApiCall ? 'Database' : 'Custom'} API: ${endpoint}`, {
+    console.info(`Fetching ${isHmmApiCall ? 'HMM Core' : 'Custom'} API: ${endpoint}`, {
       url,
       method: options.method || 'GET',
       hasAuth: !!authToken,
@@ -82,7 +82,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     try {
       // Implement fetch with timeout for better error handling
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased from 15)
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout (increased from 20)
       
       fetchOptions.signal = controller.signal;
       
@@ -126,7 +126,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       }
       
       const data = await response.json();
-      console.info(`${isDatabaseApiCall ? 'Database' : 'Custom'} API response data:`, data);
+      console.info(`${isHmmApiCall ? 'HMM Core' : 'Custom'} API response data:`, data);
       return data;
     } catch (error) {
       // Handle fetch errors with more detailed info
@@ -147,7 +147,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       throw error;
     }
   } catch (error) {
-    console.error(`Error fetching from ${endpoint.startsWith('/hmm/v1') ? 'Database' : 'Custom'} API (${endpoint}):`, error);
+    console.error(`Error fetching from ${endpoint.startsWith('/hmm/v1') ? 'HMM Core' : 'Custom'} API (${endpoint}):`, error);
     // Don't show toast for GET requests to avoid flooding the UI
     if (!options.suppressToast && options.method && options.method !== 'GET') {
       toast.error(`Lỗi API: ${error instanceof Error ? error.message : 'Không thể kết nối tới máy chủ'}`);
@@ -175,7 +175,7 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
 export async function checkDatabaseApiAuth() {
   try {
     // Log that we're checking authentication
-    console.log('Checking Database API authentication...');
+    console.log('Checking HMM Core API authentication...');
     
     // Use explicit credentials instead of relying on fetchCustomAPI to handle it
     const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
@@ -191,7 +191,7 @@ export async function checkDatabaseApiAuth() {
     
     // Try a direct fetch with explicit CORS settings instead of using fetchCustomAPI
     const url = `${API_BASE_URL}/hmm/v1/status`;
-    console.log('Checking Database API connection with URL:', url);
+    console.log('Checking HMM Core API connection with URL:', url);
     
     try {
       // Set explicit CORS headers in request
@@ -203,7 +203,7 @@ export async function checkDatabaseApiAuth() {
       
       // Implement fetch with timeout for better error handling
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased from 15)
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout (increased from 20)
       
       const response = await fetch(url, {
         method: 'GET',
@@ -217,7 +217,7 @@ export async function checkDatabaseApiAuth() {
       
       clearTimeout(timeoutId);
       
-      console.log('Database API auth check response:', {
+      console.log('HMM Core API auth check response:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
@@ -238,7 +238,7 @@ export async function checkDatabaseApiAuth() {
           // Not JSON, keep as is
         }
         
-        console.error(`Database API auth check failed (${response.status}):`, errorText);
+        console.error(`HMM Core API auth check failed (${response.status}):`, errorText);
         
         if (response.status === 401) {
           return {
@@ -250,7 +250,7 @@ export async function checkDatabaseApiAuth() {
         } else if (response.status === 404) {
           return {
             isAuthenticated: false,
-            error: 'Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt hoặc endpoint sai',
+            error: 'Lỗi 404: Plugin HMM Core API có thể chưa được kích hoạt hoặc endpoint sai',
             version: null,
             tables: []
           };
@@ -272,7 +272,7 @@ export async function checkDatabaseApiAuth() {
       }
       
       const result = await response.json();
-      console.log('Database API auth check succeeded:', result);
+      console.log('HMM Core API auth check succeeded:', result);
       
       return {
         isAuthenticated: true,
@@ -282,9 +282,9 @@ export async function checkDatabaseApiAuth() {
       };
       
     } catch (error) {
-      console.error('Fetch error during Database API auth check:', error);
+      console.error('Fetch error during HMM Core API auth check:', error);
       
-      let errorMessage = 'Không thể kết nối tới Database API';
+      let errorMessage = 'Không thể kết nối tới HMM Core API';
       
       // Check if it's a timeout
       if (error.name === 'AbortError') {
@@ -306,9 +306,9 @@ export async function checkDatabaseApiAuth() {
       };
     }
   } catch (error) {
-    console.error('Database API authentication check failed:', error);
+    console.error('HMM Core API authentication check failed:', error);
     
-    let errorMessage = 'Không thể kết nối tới Database API';
+    let errorMessage = 'Không thể kết nối tới HMM Core API';
     if (error instanceof Error) {
       errorMessage = error.message;
     }

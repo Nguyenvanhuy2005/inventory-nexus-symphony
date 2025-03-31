@@ -1,4 +1,3 @@
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { checkDatabaseApiAuth } from "@/lib/api/custom-api";
 import { 
@@ -21,17 +20,17 @@ export function useCheckAPIStatus() {
       console.log('Checking WooCommerce API authentication...');
       const woocommerceStatus = await checkWooCommerceAuth();
       
-      // Get Database API authentication status
-      console.log('Checking Database API authentication...');
-      const databaseApiStatus = await checkDatabaseApiAuth();
+      // Get HMM Core API authentication status (previously Database API)
+      console.log('Checking HMM Core API authentication...');
+      const coreApiStatus = await checkDatabaseApiAuth();
       
-      // Determine WordPress connection status from Database API result
-      // If Database API is connected, WordPress must be connected too
-      const wpConnected = databaseApiStatus.isAuthenticated;
+      // Determine WordPress connection status from Core API result
+      // If Core API is connected, WordPress must be connected too
+      const wpConnected = coreApiStatus.isAuthenticated;
       
       console.log('API status check complete:', {
         woocommerce: woocommerceStatus,
-        databaseApi: databaseApiStatus.isAuthenticated,
+        coreApi: coreApiStatus.isAuthenticated,
         wordpress: wpConnected
       });
       
@@ -42,15 +41,23 @@ export function useCheckAPIStatus() {
           hasCredentials: !!localStorage.getItem('woocommerce_consumer_key') && !!localStorage.getItem('woocommerce_consumer_secret')
         },
         databaseApi: {
-          isAuthenticated: databaseApiStatus.isAuthenticated,
-          error: databaseApiStatus.error,
-          version: databaseApiStatus.version,
-          tables: databaseApiStatus.tables || []
+          // We're keeping this property name for backward compatibility
+          isAuthenticated: coreApiStatus.isAuthenticated,
+          error: coreApiStatus.error,
+          version: coreApiStatus.version,
+          tables: coreApiStatus.tables || []
+        },
+        coreApi: {
+          // New property specifically for HMM Core API
+          isAuthenticated: coreApiStatus.isAuthenticated,
+          error: coreApiStatus.error,
+          version: coreApiStatus.version,
+          tables: coreApiStatus.tables || []
         },
         status: {
           wordpress: {
             connected: wpConnected,
-            message: wpConnected ? 'Connected' : databaseApiStatus.error || 'Failed to connect'
+            message: wpConnected ? 'Connected' : coreApiStatus.error || 'Failed to connect'
           }
         }
       };

@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { API_BASE_URL } from "./base-api";
 import { DEFAULT_WORDPRESS_CREDENTIALS } from "../auth-utils";
@@ -49,7 +50,7 @@ export async function fetchWordPress(endpoint: string, options: any = {}) {
     try {
       // Implement fetch with timeout for better error handling
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       fetchOptions.signal = controller.signal;
       
@@ -141,7 +142,8 @@ export async function uploadAttachment(file: File) {
     const formData = new FormData();
     formData.append('file', file);
     
-    const url = `${API_BASE_URL}/wp/v2/media`;
+    // Use the new HMM Core API endpoint for file uploads
+    const url = `${API_BASE_URL}/hmm/v1/media/upload`;
     console.info('Uploading file to WordPress media library');
     
     // Get authentication credentials from localStorage or defaults
@@ -155,7 +157,7 @@ export async function uploadAttachment(file: File) {
     
     // Implement fetch with timeout for better error handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for uploads
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for uploads
     
     const response = await fetch(url, {
       method: 'POST',
@@ -198,6 +200,77 @@ export async function getWordPressUsers() {
     return await fetchWordPress('/users?per_page=100');
   } catch (error) {
     console.error('Error fetching WordPress users:', error);
+    return [];
+  }
+}
+
+/**
+ * Create an attachment association for an entity (using HMM Core API)
+ * @param params Attachment parameters
+ * @returns Created attachment data
+ */
+export async function createAttachment(params: {
+  entity_type: string;
+  entity_id: number;
+  media_id?: number;
+  attachment_url: string;
+  filename: string;
+  mime_type?: string;
+}) {
+  try {
+    // Get authentication credentials
+    const username = localStorage.getItem('wordpress_username') || DEFAULT_WORDPRESS_CREDENTIALS.username;
+    const password = localStorage.getItem('wordpress_application_password') || DEFAULT_WORDPRESS_CREDENTIALS.application_password;
+
+    // Add header Basic Authentication
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+    };
+    
+    const url = `${API_BASE_URL}/hmm/v1/media/attachments`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Create attachment failed: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.info('Attachment created successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error creating attachment:', error);
+    toast.error(`Lỗi tạo liên kết tệp: ${error instanceof Error ? error.message : 'Đã xảy ra lỗi'}`);
+    throw error;
+  }
+}
+
+/**
+ * Get attachments for an entity (using HMM Core API)
+ * @param entityType Type of entity
+ * @param entityId ID of entity
+ * @returns Attachments list
+ */
+export async function getAttachments(entityType: string, entityId: number) {
+  try {
+    const url = `${API_BASE_URL}/hmm/v1/media/attachments/${entityType}/${entityId}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Get attachments failed: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.info(`Attachments for ${entityType} ${entityId}:`, data);
+    return data;
+  } catch (error) {
+    console.error('Error getting attachments:', error);
     return [];
   }
 }
