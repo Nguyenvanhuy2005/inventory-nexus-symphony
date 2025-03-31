@@ -49,11 +49,11 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
       username: username
     });
     
-    // Allow OPTIONS requests for CORS preflight
+    // Enhanced fetch options with CORS mode
     const fetchOptions: RequestInit = {
       method: options.method || 'GET',
       headers: headers,
-      credentials: 'include', // Include cookies if any
+      credentials: 'include', 
       mode: 'cors',
       ...options
     };
@@ -81,7 +81,14 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     });
     
     try {
+      // Implement fetch with timeout for better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      fetchOptions.signal = controller.signal;
+      
       const response = await fetch(url, fetchOptions);
+      clearTimeout(timeoutId);
       
       console.log('API Response received:', {
         status: response.status,
@@ -102,6 +109,11 @@ export async function fetchCustomAPI(endpoint: string, options: any = {}) {
     } catch (error) {
       // Handle fetch errors with more detailed info
       console.error(`Fetch error for ${url}:`, error);
+      
+      // Check if it's a timeout
+      if (error.name === 'AbortError') {
+        throw new Error(`Kết nối đến API đã hết thời gian chờ. Vui lòng kiểm tra mạng của bạn hoặc thử lại sau.`);
+      }
       
       // Check if it's a CORS error
       if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -166,12 +178,19 @@ export async function checkDatabaseApiAuth() {
     console.log('Checking Database API connection with URL:', url);
     
     try {
+      // Implement fetch with timeout for better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
       const response = await fetch(url, {
         method: 'GET',
         headers: headers,
         credentials: 'include',
-        mode: 'cors'
+        mode: 'cors',
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       console.log('Database API auth check response:', {
         status: response.status,
@@ -222,8 +241,12 @@ export async function checkDatabaseApiAuth() {
       
       let errorMessage = 'Không thể kết nối tới Database API';
       
+      // Check if it's a timeout
+      if (error.name === 'AbortError') {
+        errorMessage = 'Kết nối đến API đã hết thời gian chờ. Vui lòng kiểm tra lại mạng và server.';
+      }
       // Check if it's a CORS error
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      else if (error instanceof TypeError && error.message.includes('fetch')) {
         errorMessage = 'Kết nối thất bại. Có thể do lỗi CORS hoặc máy chủ không phản hồi.';
         console.error('This might be a CORS issue. Check CORS configuration on the server.');
       } else if (error instanceof Error) {

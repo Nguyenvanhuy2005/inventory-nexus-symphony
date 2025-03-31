@@ -2,7 +2,7 @@
 /**
  * Plugin Name: HMM Database API
  * Description: API để kết nối cơ sở dữ liệu WordPress với ứng dụng HMM Inventory
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: HMM
  */
 
@@ -22,18 +22,40 @@ class HMM_Database_API {
         // Tạo bảng khi kích hoạt plugin
         register_activation_hook(__FILE__, array($this, 'create_custom_tables'));
         
-        // Cho phép CORS trong development
+        // Cho phép CORS từ bất kỳ origin nào - cải thiện đáng kể
         add_action('rest_api_init', function() {
             remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
             add_filter('rest_pre_serve_request', function($value) {
-                header('Access-Control-Allow-Origin: *');
-                header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+                $origin = get_http_origin();
+                if ($origin) {
+                    header('Access-Control-Allow-Origin: ' . $origin);
+                } else {
+                    header('Access-Control-Allow-Origin: *');
+                }
+                header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH');
                 header('Access-Control-Allow-Credentials: true');
-                header('Access-Control-Allow-Headers: Content-Type, Authorization');
-                header('Access-Control-Expose-Headers: Link', false);
+                header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization');
+                header('Access-Control-Expose-Headers: Link, X-WP-Total, X-WP-TotalPages', false);
+                
+                // Xử lý pre-flight requests
+                if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                    status_header(200);
+                    exit;
+                }
+                
                 return $value;
-            });
-        }, 15);
+            }, 15);
+        });
+        
+        // Thêm route cho OPTIONS để xử lý pre-flight requests
+        add_filter('rest_endpoints', function($endpoints) {
+            foreach ($endpoints as $route => $endpoint) {
+                if (isset($endpoint['methods']) && !isset($endpoint['methods']['OPTIONS'])) {
+                    $endpoints[$route]['methods']['OPTIONS'] = true;
+                }
+            }
+            return $endpoints;
+        });
     }
     
     /**
@@ -102,6 +124,11 @@ class HMM_Database_API {
      * Đã sửa để hỗ trợ cả Application Passwords và quyền quản trị
      */
     public function api_permissions_check($request) {
+        // Cải thiện xử lý CORS cho OPTIONS requests
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            return true;
+        }
+        
         // Nếu người dùng đã đăng nhập, kiểm tra quyền
         if (is_user_logged_in() && current_user_can('manage_options')) {
             return true;
@@ -154,11 +181,12 @@ class HMM_Database_API {
         
         return array(
             'status' => 'active',
-            'version' => '1.0.2',
+            'version' => '1.0.3',
             'wordpress_version' => get_bloginfo('version'),
             'database_prefix' => $wpdb->prefix,
             'custom_tables' => $tables,
             'write_support' => true,
+            'cors_support' => true,
             'timestamp' => current_time('mysql')
         );
     }
@@ -341,7 +369,7 @@ class HMM_Database_API {
         dbDelta($sql);
         
         // Lưu version của database để kiểm tra cập nhật sau này
-        add_option('hmm_database_version', '1.0.2');
+        add_option('hmm_database_version', '1.0.3');
     }
     
     /**
@@ -806,4 +834,111 @@ function hmm_database_api_page() {
         ?>
     </div>
     <?php
+}
+
+// Đăng ký attachments API endpoints
+function hmm_register_media_api_endpoints() {
+    register_rest_route('media/v1', '/upload', array(
+        'methods' => 'POST',
+        'callback' => 'hmm_handle_media_upload',
+        'permission_callback' => function() {
+            return is_user_logged_in() || current_user_can('upload_files') || true;
+        }
+    ));
+}
+add_action('rest_api_init', 'hmm_register_media_api_endpoints');
+
+// Hàm xử lý upload media
+function hmm_handle_media_upload($request) {
+    // Kiểm tra nếu có file upload
+    if (!isset($_FILES['file'])) {
+        return new WP_Error('no_file', 'Không tìm thấy file', array('status' => 400));
+    }
+
+    // Xử lý upload file
+    $file = $_FILES['file'];
+    $upload_overrides = array('test_form' => false);
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+    // Thực hiện upload
+    $uploaded_file = wp_handle_upload($file, $upload_overrides);
+
+    if (isset($uploaded_file['error'])) {
+        return new WP_Error('upload_error', $uploaded_file['error'], array('status' => 400));
+    }
+
+    // Tạo attachment trong WordPress Media
+    $attachment = array(
+        'guid' => $uploaded_file['url'],
+        'post_mime_type' => $uploaded_file['type'],
+        'post_title' => preg_replace('/\.[^.]+$/', '', basename($file['name'])),
+        'post_content' => '',
+        'post_status' => 'inherit'
+    );
+
+    $attachment_id = wp_insert_attachment($attachment, $uploaded_file['file']);
+
+    if (is_wp_error($attachment_id)) {
+        return $attachment_id;
+    }
+
+    // Tạo các kích thước khác cho ảnh
+    wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $uploaded_file['file']));
+
+    // Lưu thông tin file vào bảng wp_hmm_attachments
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'hmm_attachments';
+    
+    // Tạo bảng wp_hmm_attachments nếu chưa tồn tại
+    if ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") != $table_name) {
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE $table_name (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            attachment_id bigint(20) NOT NULL,
+            entity_type varchar(50) NOT NULL,
+            entity_id bigint(20) DEFAULT NULL,
+            file_name varchar(255) NOT NULL,
+            file_path text NOT NULL,
+            file_url text NOT NULL,
+            file_type varchar(100) NOT NULL,
+            file_size bigint(20) NOT NULL,
+            uploaded_by bigint(20) DEFAULT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY attachment_id (attachment_id),
+            KEY entity_type (entity_type),
+            KEY entity_id (entity_id)
+        ) $charset_collate;";
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+
+    // Thêm thông tin vào bảng wp_hmm_attachments
+    $wpdb->insert(
+        $table_name,
+        array(
+            'attachment_id' => $attachment_id,
+            'entity_type' => isset($_POST['entity_type']) ? sanitize_text_field($_POST['entity_type']) : 'general',
+            'entity_id' => isset($_POST['entity_id']) ? intval($_POST['entity_id']) : null,
+            'file_name' => basename($file['name']),
+            'file_path' => $uploaded_file['file'],
+            'file_url' => $uploaded_file['url'],
+            'file_type' => $uploaded_file['type'],
+            'file_size' => $file['size'],
+            'uploaded_by' => get_current_user_id(),
+        )
+    );
+
+    // Trả về kết quả
+    return array(
+        'success' => true,
+        'attachment_id' => $attachment_id,
+        'url' => $uploaded_file['url'],
+        'type' => $uploaded_file['type'],
+        'file_name' => basename($file['name']),
+        'file_size' => $file['size'],
+    );
 }
