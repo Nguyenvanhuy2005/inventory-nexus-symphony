@@ -1,9 +1,11 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { fetchWooCommerce, fetchWordPress, fetchCustomAPI } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/api/base-api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQueryClient } from "@tanstack/react-query";
