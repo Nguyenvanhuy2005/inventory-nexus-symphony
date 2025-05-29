@@ -21,16 +21,16 @@ const ApiEndpoints = {
     { name: "Orders", path: "/orders" },
     { name: "Customers", path: "/customers" }
   ],
-  databaseApi: [
+  hmmApiBridge: [
     { name: "API Status", path: "/hmm/v1/status", method: "GET" },
     { name: "Tables List", path: "/hmm/v1/tables", method: "GET" },
-    { name: "Query (SELECT)", path: "/hmm/v1/query", method: "POST" },
-    { name: "Suppliers Structure", path: "/hmm/v1/tables/wp_hmm_suppliers", method: "GET" }
+    { name: "Dashboard Stats", path: "/hmm/v1/dashboard/stats", method: "GET" },
+    { name: "Query Test", path: "/hmm/v1/query", method: "POST" }
   ],
-  databaseApiCrud: [
-    { name: "Insert Record", path: "/hmm/v1/tables/wp_hmm_suppliers/insert", method: "POST" },
-    { name: "Update Record", path: "/hmm/v1/tables/wp_hmm_suppliers/update/1", method: "PUT" },
-    { name: "Delete Record", path: "/hmm/v1/tables/wp_hmm_suppliers/delete/1", method: "DELETE" }
+  hmmApiCrud: [
+    { name: "Insert Test", path: "/hmm/v1/tables/wp_hmm_suppliers/insert", method: "POST" },
+    { name: "Update Test", path: "/hmm/v1/tables/wp_hmm_suppliers/update/1", method: "PUT" },
+    { name: "Delete Test", path: "/hmm/v1/tables/wp_hmm_suppliers/delete/1", method: "DELETE" }
   ]
 };
 
@@ -41,21 +41,21 @@ export default function ApiConnectionTester() {
   const [results, setResults] = useState<{
     wordpress: { success: boolean; message: string; error?: string }[];
     woocommerce: { success: boolean; message: string; error?: string }[];
-    databaseApi: { success: boolean; message: string; error?: string }[];
-    databaseApiCrud: { success: boolean; message: string; error?: string }[];
+    hmmApiBridge: { success: boolean; message: string; error?: string }[];
+    hmmApiCrud: { success: boolean; message: string; error?: string }[];
   }>({
     wordpress: [],
     woocommerce: [],
-    databaseApi: [],
-    databaseApiCrud: []
+    hmmApiBridge: [],
+    hmmApiCrud: []
   });
 
   const testApiConnections = async (useCache = true) => {
     setTesting(true);
     const wordpressResults = [];
     const woocommerceResults = [];
-    const databaseApiResults = [];
-    const databaseApiCrudResults = [];
+    const hmmApiBridgeResults = [];
+    const hmmApiCrudResults = [];
 
     try {
       // Test WordPress endpoints
@@ -96,23 +96,23 @@ export default function ApiConnectionTester() {
         }
       }
 
-      // Test Database API endpoints (read-only)
-      for (const endpoint of ApiEndpoints.databaseApi) {
+      // Test HMM API Bridge endpoints
+      for (const endpoint of ApiEndpoints.hmmApiBridge) {
         try {
           if (endpoint.method === "GET") {
             const cacheParam = !useCache ? `?_=${Date.now()}` : '';
             await fetchCustomAPI(endpoint.path + cacheParam, { suppressToast: true });
-          } else {
-            // For POST endpoints, send a minimal test payload
+          } else if (endpoint.method === "POST") {
+            // For query endpoint, send a test query
             await fetchCustomAPI(endpoint.path, { 
               method: "POST", 
-              body: { query: "SELECT 1" },
+              body: { query: "SELECT 1 as test" },
               suppressToast: true,
               cache: useCache ? 'default' : 'no-cache'
             });
           }
           
-          databaseApiResults.push({
+          hmmApiBridgeResults.push({
             success: true,
             message: `${endpoint.name}: Kết nối thành công`
           });
@@ -120,11 +120,10 @@ export default function ApiConnectionTester() {
           let errorMessage = "Lỗi kết nối";
           
           if (error instanceof Error) {
-            // Enhance error messages for common issues
             if (error.message.includes('401')) {
-              errorMessage = "Lỗi xác thực (401): Thông tin đăng nhập không hợp lệ hoặc thiếu quyền";
+              errorMessage = "Lỗi xác thực (401): Kiểm tra thông tin đăng nhập WordPress";
             } else if (error.message.includes('404')) {
-              errorMessage = "Lỗi 404: Plugin HMM Database API có thể chưa được kích hoạt";
+              errorMessage = "Lỗi 404: Plugin HMM API Bridge chưa được kích hoạt";
             } else if (error.message.includes('403')) {
               errorMessage = "Lỗi 403: Không đủ quyền truy cập";
             } else {
@@ -132,7 +131,7 @@ export default function ApiConnectionTester() {
             }
           }
           
-          databaseApiResults.push({
+          hmmApiBridgeResults.push({
             success: false,
             message: `${endpoint.name}: Kết nối thất bại`,
             error: errorMessage
@@ -140,48 +139,23 @@ export default function ApiConnectionTester() {
         }
       }
       
-      // Test Database API CRUD endpoints (won't actually modify data)
-      for (const endpoint of ApiEndpoints.databaseApiCrud) {
+      // Test HMM API Bridge CRUD endpoints (OPTIONS only, don't modify data)
+      for (const endpoint of ApiEndpoints.hmmApiCrud) {
         try {
-          // Just check if the endpoint exists, don't actually modify data
-          if (endpoint.method === "POST") {
-            // For insert, we just check OPTIONS to see if the endpoint responds
-            const cacheParam = !useCache ? `?_=${Date.now()}` : '';
-            const url = `${API_BASE_URL}${endpoint.path}${cacheParam}`;
-            const response = await fetch(url, {
-              method: 'OPTIONS',
-              cache: useCache ? 'default' : 'no-cache'
+          const cacheParam = !useCache ? `?_=${Date.now()}` : '';
+          const url = `${API_BASE_URL}${endpoint.path}${cacheParam}`;
+          const response = await fetch(url, {
+            method: 'OPTIONS',
+            cache: useCache ? 'default' : 'no-cache'
+          });
+          
+          if (response.ok || response.status === 401) {
+            hmmApiCrudResults.push({
+              success: true,
+              message: `${endpoint.name}: Endpoint khả dụng`
             });
-            
-            if (response.ok || response.status === 401) {
-              // If we get 401, the endpoint exists but needs auth
-              databaseApiCrudResults.push({
-                success: true,
-                message: `${endpoint.name}: Endpoint tồn tại`
-              });
-            } else {
-              throw new Error(`HTTP error ${response.status}`);
-            }
-          } 
-          else if (endpoint.method === "PUT" || endpoint.method === "DELETE") {
-            // For update/delete, we'll assume the endpoint exists if OPTIONS returns a response
-            // or if we get an auth error (which means the endpoint exists)
-            const cacheParam = !useCache ? `?_=${Date.now()}` : '';
-            const url = `${API_BASE_URL}${endpoint.path}${cacheParam}`;
-            const response = await fetch(url, {
-              method: 'OPTIONS',
-              cache: useCache ? 'default' : 'no-cache'
-            });
-            
-            if (response.ok || response.status === 401 || response.status === 404) {
-              // 404 is ok here, it just means ID doesn't exist, but endpoint might
-              databaseApiCrudResults.push({
-                success: true,
-                message: `${endpoint.name}: Endpoint tồn tại`
-              });
-            } else {
-              throw new Error(`HTTP error ${response.status}`);
-            }
+          } else {
+            throw new Error(`HTTP error ${response.status}`);
           }
         } catch (error) {
           let errorMessage = "Lỗi kết nối";
@@ -194,9 +168,9 @@ export default function ApiConnectionTester() {
             }
           }
           
-          databaseApiCrudResults.push({
+          hmmApiCrudResults.push({
             success: false,
-            message: `${endpoint.name}: Endpoint không tồn tại hoặc không khả dụng`,
+            message: `${endpoint.name}: Endpoint không khả dụng`,
             error: errorMessage
           });
         }
@@ -205,8 +179,8 @@ export default function ApiConnectionTester() {
       setResults({
         wordpress: wordpressResults,
         woocommerce: woocommerceResults,
-        databaseApi: databaseApiResults,
-        databaseApiCrud: databaseApiCrudResults
+        hmmApiBridge: hmmApiBridgeResults,
+        hmmApiCrud: hmmApiCrudResults
       });
 
       toast.success("Đã hoàn thành kiểm tra kết nối API");
@@ -221,13 +195,8 @@ export default function ApiConnectionTester() {
   const forceRefreshCache = async () => {
     try {
       setForceClearingCache(true);
-      
-      // Clear all query cache
       queryClient.clear();
-      
-      // Clear browser cache for API calls
-      await testApiConnections(false); // Pass false to disable cache
-      
+      await testApiConnections(false);
       toast.success("Đã xóa cache và làm mới kết nối API thành công");
     } catch (error) {
       toast.error("Lỗi khi làm mới kết nối API");
@@ -252,63 +221,6 @@ export default function ApiConnectionTester() {
       </div>
     </li>
   );
-  
-  const renderEndpointsTable = () => (
-    <div className="mt-4">
-      <h3 className="text-lg font-medium mb-2">Tất cả endpoints của Database API</h3>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Endpoint</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead>Mô tả</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow>
-            <TableCell><code>/hmm/v1/status</code></TableCell>
-            <TableCell>GET</TableCell>
-            <TableCell>Kiểm tra trạng thái API</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell><code>/hmm/v1/tables</code></TableCell>
-            <TableCell>GET</TableCell>
-            <TableCell>Lấy danh sách tất cả bảng</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell><code>/hmm/v1/tables/{`{table_name}`}</code></TableCell>
-            <TableCell>GET</TableCell>
-            <TableCell>Lấy cấu trúc của bảng cụ thể</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell><code>/hmm/v1/query</code></TableCell>
-            <TableCell>POST</TableCell>
-            <TableCell>Thực hiện truy vấn SQL (chỉ SELECT)</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell><code>/hmm/v1/tables</code></TableCell>
-            <TableCell>POST</TableCell>
-            <TableCell>Tạo bảng mới</TableCell>
-          </TableRow>
-          <TableRow className="bg-green-50">
-            <TableCell><code>/hmm/v1/tables/{`{table_name}`}/insert</code></TableCell>
-            <TableCell>POST</TableCell>
-            <TableCell>Thêm dữ liệu mới vào bảng</TableCell>
-          </TableRow>
-          <TableRow className="bg-green-50">
-            <TableCell><code>/hmm/v1/tables/{`{table_name}`}/update/{`{id}`}</code></TableCell>
-            <TableCell>PUT</TableCell>
-            <TableCell>Cập nhật dữ liệu trong bảng</TableCell>
-          </TableRow>
-          <TableRow className="bg-green-50">
-            <TableCell><code>/hmm/v1/tables/{`{table_name}`}/delete/{`{id}`}</code></TableCell>
-            <TableCell>DELETE</TableCell>
-            <TableCell>Xóa dữ liệu từ bảng</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
-  );
 
   return (
     <Card className="w-full">
@@ -317,7 +229,7 @@ export default function ApiConnectionTester() {
       </CardHeader>
       <CardContent className="space-y-4">
         {results.wordpress.length === 0 && results.woocommerce.length === 0 && 
-         results.databaseApi.length === 0 && results.databaseApiCrud.length === 0 && (
+         results.hmmApiBridge.length === 0 && results.hmmApiCrud.length === 0 && (
           <div className="text-center py-6 text-muted-foreground">
             Nhấn nút "Kiểm tra kết nối API" để xem tình trạng kết nối với các API.
           </div>
@@ -341,45 +253,35 @@ export default function ApiConnectionTester() {
           </div>
         )}
         
-        {results.databaseApi.length > 0 && (
+        {results.hmmApiBridge.length > 0 && (
           <div>
-            <h3 className="text-lg font-medium mb-2">HMM Database API (Đọc dữ liệu)</h3>
+            <h3 className="text-lg font-medium mb-2">HMM API Bridge (Đọc dữ liệu)</h3>
             <ul className="space-y-2">
-              {results.databaseApi.map((result, index) => renderResultItem(result, index, 'db'))}
+              {results.hmmApiBridge.map((result, index) => renderResultItem(result, index, 'hmm'))}
             </ul>
           </div>
         )}
         
-        {results.databaseApiCrud.length > 0 && (
+        {results.hmmApiCrud.length > 0 && (
           <div>
-            <h3 className="text-lg font-medium mb-2">HMM Database API (CRUD Endpoints)</h3>
+            <h3 className="text-lg font-medium mb-2">HMM API Bridge (CRUD Endpoints)</h3>
             <ul className="space-y-2">
-              {results.databaseApiCrud.map((result, index) => renderResultItem(result, index, 'dbcrud'))}
+              {results.hmmApiCrud.map((result, index) => renderResultItem(result, index, 'hmmcrud'))}
             </ul>
           </div>
         )}
 
-        {(results.databaseApi.some(r => !r.success) || results.databaseApiCrud.some(r => !r.success)) && (
+        {(results.hmmApiBridge.some(r => !r.success) || results.hmmApiCrud.some(r => !r.success)) && (
           <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Nếu bạn thấy lỗi "401" hoặc "Unauthorized", hãy kiểm tra xác thực WordPress và đảm bảo rằng:
+              Nếu bạn thấy lỗi kết nối HMM API Bridge, hãy kiểm tra:
               <ol className="list-decimal ml-5 mt-2">
-                <li>Plugin HMM Database API đã được kích hoạt</li>
-                <li>Bạn đã đăng nhập vào WordPress với tên người dùng và mật khẩu đúng</li>
-                <li>Bạn đã tạo Application Password trong WordPress</li>
-                <li>Thông tin xác thực đã được nhập chính xác trong tab "Thông tin xác thực API"</li>
+                <li>Plugin HMM API Bridge đã được kích hoạt trong WordPress</li>
+                <li>Thông tin WordPress Username và Application Password chính xác</li>
+                <li>Người dùng có quyền edit_posts hoặc manage_options</li>
+                <li>Plugin đã tự động tạo các bảng cần thiết</li>
               </ol>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {(results.wordpress.some(r => !r.success) || results.woocommerce.some(r => !r.success) || 
-          results.databaseApi.some(r => !r.success) || results.databaseApiCrud.some(r => !r.success)) && (
-          <Alert className="bg-amber-50 border-amber-200">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">
-              Một số kết nối không thành công. Kiểm tra cài đặt xác thực API và đảm bảo rằng các plugin WordPress đã được kích hoạt đúng cách.
             </AlertDescription>
           </Alert>
         )}

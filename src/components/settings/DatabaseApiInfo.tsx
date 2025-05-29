@@ -32,10 +32,10 @@ export default function DatabaseApiInfo() {
     }
   };
 
-  const coreApiTables = apiStatus.data?.coreApi?.tables || [];
-  const isApiAuthenticated = apiStatus.data?.coreApi?.isAuthenticated || false;
-  const apiVersion = apiStatus.data?.coreApi?.version || 'Unknown';
-  const apiError = apiStatus.data?.coreApi?.error || null;
+  const apiTables = apiStatus.data?.databaseApi?.tables || [];
+  const isApiAuthenticated = apiStatus.data?.databaseApi?.isAuthenticated || false;
+  const apiVersion = apiStatus.data?.databaseApi?.version || 'Unknown';
+  const apiError = apiStatus.data?.databaseApi?.error || null;
 
   return (
     <div className="space-y-6">
@@ -43,9 +43,9 @@ export default function DatabaseApiInfo() {
         <CardHeader className="bg-primary text-primary-foreground">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>HMM Core API Status</CardTitle>
+              <CardTitle>HMM API Bridge Status</CardTitle>
               <CardDescription className="text-primary-foreground/80">
-                Trạng thái kết nối và thông tin HMM Core API
+                Trạng thái kết nối và thông tin HMM API Bridge Plugin
               </CardDescription>
             </div>
             <Button 
@@ -79,7 +79,7 @@ export default function DatabaseApiInfo() {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Lỗi kết nối</AlertTitle>
               <AlertDescription>
-                Không thể kết nối đến HMM Core API: {apiStatus.error?.message || "Unknown error"}
+                Không thể kết nối đến HMM API Bridge: {apiStatus.error?.message || "Unknown error"}
               </AlertDescription>
             </Alert>
           ) : (
@@ -89,7 +89,7 @@ export default function DatabaseApiInfo() {
                   <div>
                     <h3 className="text-lg font-medium">Trạng thái kết nối</h3>
                     <p className="text-sm text-muted-foreground">
-                      Kết nối và xác thực với HMM Core API
+                      Kết nối và xác thực với HMM API Bridge Plugin
                     </p>
                   </div>
                   <div className="flex items-center">
@@ -116,7 +116,7 @@ export default function DatabaseApiInfo() {
                 )}
                 
                 <div>
-                  <h3 className="text-lg font-medium">Thông tin API</h3>
+                  <h3 className="text-lg font-medium">Thông tin Plugin</h3>
                   <div className="mt-2 rounded-md border p-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -125,15 +125,15 @@ export default function DatabaseApiInfo() {
                       </div>
                       <div>
                         <p className="text-sm font-medium">Số lượng bảng</p>
-                        <p className="text-sm text-muted-foreground">{coreApiTables.length}</p>
+                        <p className="text-sm text-muted-foreground">{apiTables.length}</p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                {coreApiTables.length > 0 && (
+                {apiTables.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-medium">Danh sách bảng</h3>
+                    <h3 className="text-lg font-medium">Danh sách bảng HMM</h3>
                     <div className="mt-2 max-h-80 overflow-y-auto rounded-md border">
                       <table className="w-full">
                         <thead>
@@ -144,9 +144,9 @@ export default function DatabaseApiInfo() {
                           </tr>
                         </thead>
                         <tbody>
-                          {coreApiTables.map((table: any, index: number) => (
+                          {apiTables.map((table: any, index: number) => (
                             <tr key={index} className="border-b">
-                              <td className="px-4 py-2 text-sm">{table.name}</td>
+                              <td className="px-4 py-2 text-sm font-mono">{table.name}</td>
                               <td className="px-4 py-2 text-sm">{table.count}</td>
                               <td className="px-4 py-2 text-sm">
                                 {table.status === 'active' ? (
@@ -169,14 +169,24 @@ export default function DatabaseApiInfo() {
                 )}
 
                 <div className="rounded-md border p-4">
-                  <h3 className="font-medium">Hướng dẫn</h3>
-                  <ul className="mt-2 list-disc pl-5 text-sm">
-                    <li>Nếu không thấy kết nối, hãy kiểm tra plugin HMM Core API đã được kích hoạt trên WordPress.</li>
-                    <li>Đảm bảo thông tin WordPress Username và Application Password chính xác.</li>
-                    <li>Kiểm tra quyền của người dùng WordPress (cần có quyền edit_posts hoặc manage_options).</li>
-                    <li>Đảm bảo cấu hình CORS đã được thiết lập đúng trên máy chủ WordPress.</li>
+                  <h3 className="font-medium">Hướng dẫn sử dụng HMM API Bridge</h3>
+                  <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                    <li>Plugin HMM API Bridge cung cấp REST API endpoints để truy cập database WordPress</li>
+                    <li>Đảm bảo plugin đã được kích hoạt trong WordPress Admin → Plugins</li>
+                    <li>Kiểm tra quyền người dùng (cần có quyền edit_posts hoặc manage_options)</li>
+                    <li>Plugin tự động tạo các bảng cần thiết khi được kích hoạt</li>
+                    <li>Hỗ trợ các endpoints: /status, /tables, /query, CRUD operations, /dashboard/stats</li>
                   </ul>
                 </div>
+
+                {isApiAuthenticated && (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-4">
+                    <h3 className="font-medium text-green-800">✅ Kết nối thành công!</h3>
+                    <p className="text-sm text-green-700 mt-1">
+                      HMM API Bridge đang hoạt động bình thường. Bạn có thể sử dụng tất cả các tính năng của hệ thống.
+                    </p>
+                  </div>
+                )}
               </div>
             </>
           )}

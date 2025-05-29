@@ -3,15 +3,15 @@ import { toast } from "sonner";
 import { fetchCustomAPI } from './custom-api';
 
 /**
- * Fetch data from a table in the database
+ * Fetch data from a table in the database using HMM API Bridge
  * @param tableName Table name (without prefix)
  * @param options Additional options
  * @returns Promise with database results
  */
 export async function fetchDatabaseTable(tableName: string, options: any = {}) {
   try {
-    // Sử dụng endpoint truy vấn SQL tiêu chuẩn
-    const query = `SELECT * FROM wp_hmm_${tableName} LIMIT 100`;
+    // Sử dụng endpoint query của HMM API Bridge
+    const query = `SELECT * FROM wp_hmm_${tableName} ORDER BY id DESC LIMIT 100`;
     const result = await fetchCustomAPI('/hmm/v1/query', {
       method: 'POST',
       body: { query },
@@ -34,14 +34,14 @@ export async function fetchDatabaseTable(tableName: string, options: any = {}) {
 }
 
 /**
- * Insert a new record into a database table
+ * Insert a new record into a database table using HMM API Bridge
  * @param tableName Table name (without prefix)
  * @param data Record data to insert
  * @returns Promise with insert result
  */
 export async function insertDatabaseRecord(tableName: string, data: any) {
   try {
-    // Sử dụng endpoint chính thức của API
+    // Sử dụng endpoint insert của HMM API Bridge
     const result = await fetchCustomAPI(`/hmm/v1/tables/wp_hmm_${tableName}/insert`, {
       method: 'POST',
       body: data
@@ -62,7 +62,7 @@ export async function insertDatabaseRecord(tableName: string, data: any) {
 }
 
 /**
- * Update an existing record in a database table
+ * Update an existing record in a database table using HMM API Bridge
  * @param tableName Table name (without prefix)
  * @param id Record ID to update
  * @param data Record data to update
@@ -70,7 +70,7 @@ export async function insertDatabaseRecord(tableName: string, data: any) {
  */
 export async function updateDatabaseRecord(tableName: string, id: number, data: any) {
   try {
-    // Sử dụng endpoint chính thức của API
+    // Sử dụng endpoint update của HMM API Bridge
     const result = await fetchCustomAPI(`/hmm/v1/tables/wp_hmm_${tableName}/update/${id}`, {
       method: 'PUT',
       body: data
@@ -91,14 +91,14 @@ export async function updateDatabaseRecord(tableName: string, id: number, data: 
 }
 
 /**
- * Delete a record from a database table
+ * Delete a record from a database table using HMM API Bridge
  * @param tableName Table name (without prefix)
  * @param id Record ID to delete
  * @returns Promise with delete result
  */
 export async function deleteDatabaseRecord(tableName: string, id: number) {
   try {
-    // Sử dụng endpoint chính thức của API
+    // Sử dụng endpoint delete của HMM API Bridge
     const result = await fetchCustomAPI(`/hmm/v1/tables/wp_hmm_${tableName}/delete/${id}`, {
       method: 'DELETE'
     });
@@ -114,5 +114,40 @@ export async function deleteDatabaseRecord(tableName: string, id: number) {
     console.error(`Error deleting record ${id} from table ${tableName}:`, error);
     toast.error(`Lỗi xóa dữ liệu từ bảng ${tableName}: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
     throw error;
+  }
+}
+
+/**
+ * Get database tables list using HMM API Bridge
+ * @returns Promise with tables list
+ */
+export async function getDatabaseTables() {
+  try {
+    const result = await fetchCustomAPI('/hmm/v1/tables', {
+      method: 'GET'
+    });
+    
+    return result.tables || [];
+  } catch (error) {
+    console.error('Error fetching database tables:', error);
+    toast.error('Lỗi lấy danh sách bảng database');
+    throw error;
+  }
+}
+
+/**
+ * Get dashboard stats using HMM API Bridge
+ * @returns Promise with dashboard stats
+ */
+export async function getDashboardStats() {
+  try {
+    const result = await fetchCustomAPI('/hmm/v1/dashboard/stats', {
+      method: 'GET'
+    });
+    
+    return result.stats || {};
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    return {};
   }
 }
