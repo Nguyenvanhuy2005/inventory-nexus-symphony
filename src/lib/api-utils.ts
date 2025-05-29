@@ -168,3 +168,68 @@ export function formatFileSize(bytes: number): string {
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// API Functions - Re-export from api module
+export { fetchWooCommerce } from './api/woocommerce-api';
+export { fetchCustomAPI } from './api/custom-api';
+export { uploadAttachment } from './api/wordpress-api';
+export { exportToCSV, syncProductsWithStockLevels, getTransactionTypeDisplay, formatTransactionForDisplay } from './api/utils';
+
+/**
+ * Fetch stock levels from HMM API Bridge
+ */
+export async function fetchStockLevels() {
+  try {
+    const response = await fetchCustomAPI('/hmm/v1/tables/wp_hmm_stock_levels/select', {
+      method: 'GET'
+    });
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching stock levels:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mock WooCommerce data for fallback
+ */
+export const mockWooCommerceData = {
+  products: [
+    {
+      id: 1,
+      name: "Sản phẩm mẫu 1",
+      sku: "SP001",
+      price: "100000",
+      regular_price: "100000",
+      sale_price: "",
+      stock_quantity: 50,
+      stock_status: "instock",
+      images: [
+        {
+          id: 1,
+          src: "https://via.placeholder.com/300x300",
+          alt: "Sản phẩm mẫu 1"
+        }
+      ],
+      categories: []
+    },
+    {
+      id: 2,
+      name: "Sản phẩm mẫu 2",
+      sku: "SP002",
+      price: "200000",
+      regular_price: "200000",
+      sale_price: "",
+      stock_quantity: 25,
+      stock_status: "instock",
+      images: [
+        {
+          id: 2,
+          src: "https://via.placeholder.com/300x300",
+          alt: "Sản phẩm mẫu 2"
+        }
+      ],
+      categories: []
+    }
+  ]
+};
