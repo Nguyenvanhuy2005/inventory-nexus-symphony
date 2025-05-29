@@ -13,6 +13,35 @@ export const DEFAULT_WORDPRESS_CREDENTIALS = {
 };
 
 /**
+ * Initialize default credentials if not already set
+ */
+export function initializeDefaultCredentials() {
+  // Initialize WooCommerce credentials if not set
+  if (!localStorage.getItem('woocommerce_consumer_key')) {
+    localStorage.setItem('woocommerce_consumer_key', DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_key);
+  }
+  if (!localStorage.getItem('woocommerce_consumer_secret')) {
+    localStorage.setItem('woocommerce_consumer_secret', DEFAULT_WOOCOMMERCE_CREDENTIALS.consumer_secret);
+  }
+  
+  // Initialize WordPress credentials if not set
+  if (!localStorage.getItem('wordpress_username')) {
+    localStorage.setItem('wordpress_username', DEFAULT_WORDPRESS_CREDENTIALS.username);
+  }
+  if (!localStorage.getItem('wordpress_application_password')) {
+    localStorage.setItem('wordpress_application_password', DEFAULT_WORDPRESS_CREDENTIALS.application_password);
+  }
+  
+  // Set default API URLs if not set
+  if (!localStorage.getItem('api_url')) {
+    localStorage.setItem('api_url', 'https://hanoi.sithethao.com/wp-json');
+  }
+  if (!localStorage.getItem('woocommerce_api_url')) {
+    localStorage.setItem('woocommerce_api_url', 'https://hanoi.sithethao.com/wp-json/wc/v3');
+  }
+}
+
+/**
  * Check if WooCommerce API is accessible
  */
 export async function checkWooCommerceAuth(): Promise<{ isAuthenticated: boolean; error?: string }> {
@@ -93,6 +122,18 @@ export async function checkDatabaseApiAuth(): Promise<{
       tables: []
     };
   }
+}
+
+/**
+ * Check if system is fully connected
+ */
+export function isFullyConnected(): boolean {
+  return !!(
+    localStorage.getItem('woocommerce_consumer_key') && 
+    localStorage.getItem('woocommerce_consumer_secret') &&
+    localStorage.getItem('wordpress_username') && 
+    localStorage.getItem('wordpress_application_password')
+  );
 }
 
 /**

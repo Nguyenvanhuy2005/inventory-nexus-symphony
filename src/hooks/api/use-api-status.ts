@@ -36,8 +36,8 @@ export function useCheckAPIStatus() {
       
       return {
         woocommerce: {
-          isAuthenticated: woocommerceStatus,
-          error: woocommerceStatus ? null : 'Không thể xác thực với WooCommerce API',
+          isAuthenticated: woocommerceStatus.isAuthenticated,
+          error: woocommerceStatus.isAuthenticated ? null : 'Không thể xác thực với WooCommerce API',
           hasCredentials: !!localStorage.getItem('woocommerce_consumer_key') && !!localStorage.getItem('woocommerce_consumer_secret')
         },
         databaseApi: {
