@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-class HMM_Database_API {
+class HMM_Database_API_Standalone {
     /**
      * Constructor
      */
@@ -50,8 +50,10 @@ class HMM_Database_API {
         // Thêm route cho OPTIONS để xử lý pre-flight requests
         add_filter('rest_endpoints', function($endpoints) {
             foreach ($endpoints as $route => $endpoint) {
-                if (isset($endpoint['methods']) && !isset($endpoint['methods']['OPTIONS'])) {
-                    $endpoints[$route]['methods']['OPTIONS'] = true;
+                if (is_array($endpoint) && isset($endpoint['methods'])) {
+                    if (is_array($endpoint['methods']) && !isset($endpoint['methods']['OPTIONS'])) {
+                        $endpoints[$route]['methods']['OPTIONS'] = true;
+                    }
                 }
             }
             return $endpoints;
@@ -802,7 +804,7 @@ class HMM_Database_API {
 }
 
 // Khởi tạo plugin
-new HMM_Database_API();
+new HMM_Database_API_Standalone();
 
 // Thêm menu admin để quản lý API
 function hmm_database_api_menu() {
