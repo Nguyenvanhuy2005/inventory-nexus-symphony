@@ -1,18 +1,25 @@
-
 <?php
 /**
  * Plugin Name: HMM Media API
- * Plugin URI: https://hmm.vn
+ * Plugin URI: https://hanoi.sithethao.com
  * Description: Plugin tạo REST API endpoints cho việc quản lý và tải lên tập tin 
  * Version: 1.0.0
  * Author: HMM Team
- * Author URI: https://hmm.vn
+ * Author URI: https://hanoi.sithethao.com
  * Text Domain: hmm-media-api
+ * Domain Path: /languages
  */
 
 // Đảm bảo không truy cập trực tiếp
 if (!defined('ABSPATH')) {
     exit;
+}
+
+// Load text domain properly at init action
+add_action('init', 'hmm_media_load_textdomain');
+
+function hmm_media_load_textdomain() {
+    load_plugin_textdomain('hmm-media-api', false, dirname(plugin_basename(__FILE__)) . '/languages');
 }
 
 // Đăng ký REST API routes

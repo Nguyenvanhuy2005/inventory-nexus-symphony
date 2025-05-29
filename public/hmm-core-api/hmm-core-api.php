@@ -1,13 +1,13 @@
-
 <?php
 /**
  * Plugin Name: HMM Core API
- * Plugin URI: https://hcm.sithethao.com
+ * Plugin URI: https://hanoi.sithethao.com
  * Description: Plugin tổng hợp các API endpoints cho ứng dụng HMM Inventory (Database, Media, Custom API)
  * Version: 1.0.0
  * Author: HMM Team
- * Author URI: https://hcm.sithethao.com
+ * Author URI: https://hanoi.sithethao.com
  * Text Domain: hmm-core-api
+ * Domain Path: /languages
  */
 
 // Đảm bảo không truy cập trực tiếp
@@ -28,6 +28,9 @@ class HMM_Core_API {
      * Constructor
      */
     public function __construct() {
+        // Load text domain properly at init action
+        add_action('init', array($this, 'load_textdomain'));
+        
         // Khởi tạo REST API
         add_action('rest_api_init', array($this, 'register_api_routes'));
         
@@ -48,13 +51,20 @@ class HMM_Core_API {
         add_filter('determine_current_user', array($this, 'determine_current_user_from_token'), 20);
         
         // Khởi chạy các modules
-        $this->load_modules();
+        add_action('init', array($this, 'load_modules'));
+    }
+    
+    /**
+     * Load plugin text domain for translations
+     */
+    public function load_textdomain() {
+        load_plugin_textdomain('hmm-core-api', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
     
     /**
      * Load plugin modules
      */
-    private function load_modules() {
+    public function load_modules() {
         // Include module files
         require_once(HMM_CORE_API_PATH . 'includes/class-database-api.php');
         require_once(HMM_CORE_API_PATH . 'includes/class-media-api.php');
@@ -470,4 +480,3 @@ class HMM_Core_API {
 
 // Initialize plugin
 $hmm_core_api = new HMM_Core_API();
-
