@@ -2,8 +2,8 @@ import { toast } from "sonner";
 import { initializeDefaultCredentials } from "../auth-utils";
 
 // API base URLs with fallbacks that will work in browser environment
-export const API_BASE_URL = localStorage.getItem('api_url') || import.meta.env.VITE_API_URL || 'https://hcm.sithethao.com/wp-json';
-export const WOOCOMMERCE_API_URL = localStorage.getItem('woocommerce_api_url') || import.meta.env.VITE_WOOCOMMERCE_API_URL || 'https://hcm.sithethao.com/wp-json/wc/v3';
+export const API_BASE_URL = localStorage.getItem('api_url') || import.meta.env.VITE_API_URL || 'https://hanoi.sithethao.com/wp-json';
+export const WOOCOMMERCE_API_URL = localStorage.getItem('woocommerce_api_url') || import.meta.env.VITE_WOOCOMMERCE_API_URL || 'https://hanoi.sithethao.com/wp-json/wc/v3';
 
 // WooCommerce authentication keys from environment or localStorage
 export function getConsumerKey() {
