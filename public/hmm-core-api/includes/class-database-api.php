@@ -1,7 +1,6 @@
-
 <?php
 /**
- * HMM Database API Class
+ * HMM Core Database API Class
  * 
  * Handles database operations and REST API endpoints
  */
@@ -11,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class HMM_Database_API {
+class HMM_Core_Database_API {
     /**
      * Constructor
      */

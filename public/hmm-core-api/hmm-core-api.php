@@ -41,9 +41,6 @@ class HMM_Core_API {
         // Cải thiện CORS cho tất cả REST API requests
         add_action('rest_api_init', array($this, 'setup_cors_support'));
         
-        // Thêm route cho OPTIONS để xử lý pre-flight requests
-        add_filter('rest_endpoints', array($this, 'add_options_endpoints'));
-        
         // Hook trước khi gửi response để thêm debug headers nếu cần
         add_filter('rest_pre_serve_request', array($this, 'add_debug_headers'), 10, 4);
         
@@ -65,15 +62,21 @@ class HMM_Core_API {
      * Load plugin modules
      */
     public function load_modules() {
-        // Include module files
-        require_once(HMM_CORE_API_PATH . 'includes/class-database-api.php');
-        require_once(HMM_CORE_API_PATH . 'includes/class-media-api.php');
-        require_once(HMM_CORE_API_PATH . 'includes/class-custom-api.php');
+        // Check if classes don't exist before including
+        if (!class_exists('HMM_Core_Database_API')) {
+            require_once(HMM_CORE_API_PATH . 'includes/class-database-api.php');
+            new HMM_Core_Database_API();
+        }
         
-        // Initialize modules
-        new HMM_Database_API();
-        new HMM_Media_API();
-        new HMM_Custom_API();
+        if (!class_exists('HMM_Core_Media_API')) {
+            require_once(HMM_CORE_API_PATH . 'includes/class-media-api.php');
+            new HMM_Core_Media_API();
+        }
+        
+        if (!class_exists('HMM_Core_Custom_API')) {
+            require_once(HMM_CORE_API_PATH . 'includes/class-custom-api.php');
+            new HMM_Core_Custom_API();
+        }
     }
     
     /**
@@ -478,5 +481,7 @@ class HMM_Core_API {
     }
 }
 
-// Initialize plugin
-$hmm_core_api = new HMM_Core_API();
+// Initialize plugin only if not already initialized
+if (!isset($GLOBALS['hmm_core_api'])) {
+    $GLOBALS['hmm_core_api'] = new HMM_Core_API();
+}

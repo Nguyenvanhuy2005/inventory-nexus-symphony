@@ -1,7 +1,6 @@
-
 <?php
 /**
- * HMM Media API Class
+ * HMM Core Media API Class
  * 
  * Handles media uploads and management
  */
@@ -11,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class HMM_Media_API {
+class HMM_Core_Media_API {
     /**
      * Constructor
      */

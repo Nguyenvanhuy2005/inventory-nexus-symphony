@@ -1,6 +1,6 @@
 <?php
 /**
- * HMM Custom API Class
+ * HMM Core Custom API Class
  * 
  * Handles custom API endpoints and business logic
  */
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class HMM_Custom_API {
+class HMM_Core_Custom_API {
     /**
      * Constructor
      */
