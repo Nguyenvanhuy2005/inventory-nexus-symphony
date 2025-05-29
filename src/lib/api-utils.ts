@@ -180,6 +180,8 @@ export { exportToCSV, syncProductsWithStockLevels, getTransactionTypeDisplay, fo
  */
 export async function fetchStockLevels() {
   try {
+    // Import fetchCustomAPI from the correct module
+    const { fetchCustomAPI } = await import('./api/custom-api');
     const response = await fetchCustomAPI('/hmm/v1/tables/wp_hmm_stock_levels/select', {
       method: 'GET'
     });
@@ -208,7 +210,7 @@ export const mockWooCommerceData = {
         {
           id: 1,
           src: "https://via.placeholder.com/300x300",
-          alt: "Sản phẩm mẫu 1"
+          name: "Sản phẩm mẫu 1"
         }
       ],
       categories: []
@@ -226,7 +228,7 @@ export const mockWooCommerceData = {
         {
           id: 2,
           src: "https://via.placeholder.com/300x300",
-          alt: "Sản phẩm mẫu 2"
+          name: "Sản phẩm mẫu 2"
         }
       ],
       categories: []
