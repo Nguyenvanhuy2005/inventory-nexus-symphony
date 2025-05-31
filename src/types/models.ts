@@ -87,6 +87,7 @@ export interface Supplier {
   tax_id?: string;
   initial_debt?: number;
   current_debt?: number;
+  total_debt?: number;
   notes?: string;
   status: 'active' | 'inactive';
   created_at: string;

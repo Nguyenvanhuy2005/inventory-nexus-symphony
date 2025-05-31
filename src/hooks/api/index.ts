@@ -5,7 +5,23 @@ export * from './use-products';
 export * from './use-customers';
 export * from './use-suppliers';
 export * from './use-stock';
-export * from './use-payments';
 export * from './use-inventory';
-export * from './use-damaged-stock';
-export * from './use-payment-receipts';
+
+// Export specific hooks from payment files to avoid conflicts
+export { 
+  useGetPaymentReceipt,
+  useCreatePaymentReceipt as useCreatePaymentReceiptDB,
+  useUpdatePaymentReceipt,
+  useDeletePaymentReceipt 
+} from './use-payment-receipts';
+
+export { 
+  useGetPaymentReceipts as useGetPaymentsAPI,
+  useCreatePaymentReceipt as useCreatePaymentAPI 
+} from './use-payments';
+
+// Export specific hooks from damaged stock to avoid conflicts  
+export {
+  useGetDamagedStock as useGetDamagedStockDB,
+  useCreateDamagedStock as useCreateDamagedStockDB
+} from './use-damaged-stock';
