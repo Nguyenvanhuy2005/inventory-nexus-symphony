@@ -1,23 +1,24 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Search, FileDown } from "lucide-react";
+import { Search, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { useGetStockTransactions } from "@/hooks/api-hooks";
-import { AlertTriangle } from "lucide-react";
-import { StockTransaction } from "@/types/models";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { formatDate, formatCurrency } from "@/lib/utils";
+import { useGetStockTransactions } from "@/hooks/api-hooks";
+import { StockTransaction } from "@/types/models";
 
 export default function StockTransactions() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   
-  const { data: stockData = [], isLoading, isError } = useGetStockTransactions();
+  const { data: stockData = [], isLoading, isError, error, refetch } = useGetStockTransactions();
   
   // Handle both array and paginated response format
   const stockTransactions = Array.isArray(stockData) ? stockData : stockData.transactions || [];
@@ -32,11 +33,11 @@ export default function StockTransactions() {
 
   return (
     <div className="space-y-6">
-      <DashboardHeader
-        title="Quản lý giao dịch kho"
-        description="Xem và quản lý các giao dịch kho"
+      <DashboardHeader 
+        title="Giao dịch kho" 
+        description="Theo dõi tất cả các giao dịch xuất nhập kho"
       />
-
+      
       <Card className="p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div className="relative">
@@ -60,81 +61,96 @@ export default function StockTransactions() {
                 <SelectItem value="return">Trả hàng</SelectItem>
                 <SelectItem value="sale">Bán hàng</SelectItem>
                 <SelectItem value="adjustment">Điều chỉnh</SelectItem>
-                <SelectItem value="damaged">Hàng hỏng</SelectItem>
+                <SelectItem value="damaged">Hỏng hóc</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <FileDown className="mr-2 h-4 w-4" />
-              Xuất báo cáo
-            </Button>
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="mt-8 flex items-center justify-center">
-            <p>Đang tải dữ liệu...</p>
-          </div>
-        ) : isError ? (
-          <div className="mt-8 flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
-            <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
-            <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
-            <p className="text-muted-foreground mt-1 mb-4">
-              Đã xảy ra lỗi khi tải dữ liệu giao dịch kho từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
-              {error instanceof Error && <span className="block mt-2 text-xs">{error.message}</span>}
-            </p>
-            <Button variant="outline" onClick={() => refetch()}>
-              Thử lại
-            </Button>
-          </div>
-        ) : filteredTransactions.length > 0 ? (
-          <div className="mt-6 rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ngày</TableHead>
-                  <TableHead>Mã giao dịch</TableHead>
-                  <TableHead>Sản phẩm</TableHead>
-                  <TableHead>Loại giao dịch</TableHead>
-                  <TableHead>Số lượng</TableHead>
-                  <TableHead>Số lượng trước</TableHead>
-                  <TableHead>Số lượng hiện tại</TableHead>
-                  <TableHead>Tham chiếu</TableHead>
-                  <TableHead>Ghi chú</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTransactions.map((transaction: StockTransaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>{formatDate(transaction.created_at)}</TableCell>
-                    <TableCell>{transaction.transaction_id}</TableCell>
-                    <TableCell>{transaction.product_name}</TableCell>
-                    <TableCell>
-                      {transaction.type === 'goods_receipt' ? 'Nhập hàng' :
-                        transaction.type === 'return' ? 'Trả hàng' :
-                          transaction.type === 'sale' ? 'Bán hàng' :
-                            transaction.type === 'adjustment' ? 'Điều chỉnh' :
-                              transaction.type === 'damaged' ? 'Hàng hỏng' : 'Không xác định'}
-                    </TableCell>
-                    <TableCell>{transaction.quantity}</TableCell>
-                    <TableCell>{transaction.previous_quantity}</TableCell>
-                    <TableCell>{transaction.current_quantity}</TableCell>
-                    <TableCell>{transaction.reference_id}</TableCell>
-                    <TableCell>{transaction.notes || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="mt-8 flex items-center justify-center p-8 border border-dashed rounded-lg">
-            <div className="text-center">
-              <h3 className="text-lg font-medium">Không có giao dịch kho</h3>
-              <p className="text-muted-foreground mt-1">
-                Không tìm thấy giao dịch kho nào phù hợp với tìm kiếm của bạn.
-              </p>
+        {/* Stock Transactions Table */}
+        <div className="mt-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <p>Đang tải dữ liệu...</p>
             </div>
-          </div>
-        )}
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center text-center p-6 border border-dashed rounded-lg">
+              <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
+              <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
+              <p className="text-muted-foreground mt-1 mb-4">
+                Đã xảy ra lỗi khi tải dữ liệu giao dịch kho: {error?.message || 'Lỗi không xác định'}
+              </p>
+              <Button variant="outline" onClick={() => refetch?.()}>
+                Thử lại
+              </Button>
+            </div>
+          ) : filteredTransactions.length === 0 ? (
+            <div className="flex items-center justify-center p-8 border border-dashed rounded-lg">
+              <div className="text-center">
+                <h3 className="text-lg font-medium">Chưa có giao dịch nào</h3>
+                <p className="text-muted-foreground mt-1">
+                  Các giao dịch kho sẽ xuất hiện ở đây
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mã giao dịch</TableHead>
+                    <TableHead>Sản phẩm</TableHead>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Số lượng</TableHead>
+                    <TableHead>Trước đó</TableHead>
+                    <TableHead>Hiện tại</TableHead>
+                    <TableHead>Tham chiếu</TableHead>
+                    <TableHead>Ngày tạo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="font-medium">
+                        {transaction.transaction_id}
+                      </TableCell>
+                      <TableCell>{transaction.product_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          transaction.type === 'goods_receipt' ? 'default' :
+                          transaction.type === 'sale' ? 'destructive' :
+                          transaction.type === 'return' ? 'secondary' :
+                          transaction.type === 'adjustment' ? 'outline' :
+                          'default'
+                        }>
+                          {transaction.type === 'goods_receipt' ? 'Nhập hàng' :
+                           transaction.type === 'sale' ? 'Bán hàng' :
+                           transaction.type === 'return' ? 'Trả hàng' :
+                           transaction.type === 'adjustment' ? 'Điều chỉnh' :
+                           transaction.type === 'damaged' ? 'Hỏng hóc' :
+                           transaction.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className={transaction.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
+                          {transaction.quantity > 0 ? '+' : ''}{transaction.quantity}
+                        </span>
+                      </TableCell>
+                      <TableCell>{transaction.previous_quantity}</TableCell>
+                      <TableCell>{transaction.current_quantity}</TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {transaction.reference_type}: {transaction.reference_id}
+                        </span>
+                      </TableCell>
+                      <TableCell>{formatDate(transaction.created_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );

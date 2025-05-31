@@ -24,13 +24,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, PaperclipIcon, Upload } from 'lucide-react';
+import { CalendarIcon, PaperclipIcon } from 'lucide-react';
 import { useCreatePaymentReceipt } from '@/hooks/api-hooks';
 import { uploadAttachment } from '@/lib/api-utils';
 
 // Form validation schema
 const formSchema = z.object({
-  entity: z.enum(['customer', 'supplier'], {
+  entity_type: z.enum(['customer', 'supplier'], {
     required_error: 'Vui lòng chọn đối tượng',
   }),
   entity_id: z.number({
@@ -47,10 +47,10 @@ const formSchema = z.object({
   }).positive({
     message: 'Số tiền phải lớn hơn 0',
   }),
-  payment_method: z.string().min(1, {
-    message: 'Vui lòng chọn phương thức thanh toán',
+  payment_method: z.enum(['cash', 'bank_transfer', 'card', 'other'], {
+    required_error: 'Vui lòng chọn phương thức thanh toán',
   }),
-  type: z.enum(['receipt', 'payment'], {
+  type: z.enum(['income', 'expense'], {
     required_error: 'Vui lòng chọn loại phiếu',
   }),
   notes: z.string().optional(),
@@ -67,7 +67,7 @@ interface CreatePaymentReceiptFormProps {
   initialEntityId?: number;
   initialEntityName?: string;
   onSuccess?: () => void;
-  initialType?: 'receipt' | 'payment';
+  initialType?: 'income' | 'expense';
 }
 
 export default function CreatePaymentReceiptForm({
@@ -76,7 +76,7 @@ export default function CreatePaymentReceiptForm({
   initialEntityId,
   initialEntityName,
   onSuccess,
-  initialType = 'receipt',
+  initialType = 'income',
 }: CreatePaymentReceiptFormProps) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -85,7 +85,7 @@ export default function CreatePaymentReceiptForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      entity: initialEntity || 'customer',
+      entity_type: initialEntity || 'customer',
       entity_id: initialEntityId || 0,
       entity_name: initialEntityName || '',
       date: new Date(),
@@ -124,16 +124,15 @@ export default function CreatePaymentReceiptForm({
   // Handle form submission
   const onSubmit = (data: FormValues) => {
     createPaymentReceipt({
-      receipt_id: `PR-${Date.now()}`,
-      entity: data.entity,
+      entity_type: data.entity_type,
       entity_id: data.entity_id,
       entity_name: data.entity_name,
       date: format(data.date, 'yyyy-MM-dd'),
       amount: data.amount,
       payment_method: data.payment_method,
-      notes: data.notes || '',
       type: data.type,
       description: data.description || '',
+      notes: data.notes || '',
       attachment_url: data.attachment_url,
     }, {
       onSuccess: () => {
@@ -145,12 +144,12 @@ export default function CreatePaymentReceiptForm({
   
   // Helper to get entity label
   const getEntityLabel = () => {
-    return form.watch('entity') === 'customer' ? 'Khách hàng' : 'Nhà cung cấp';
+    return form.watch('entity_type') === 'customer' ? 'Khách hàng' : 'Nhà cung cấp';
   };
   
   // Helper to get receipt type label
   const getReceiptTypeLabel = () => {
-    return form.watch('type') === 'receipt' ? 'Phiếu thu' : 'Phiếu chi';
+    return form.watch('type') === 'income' ? 'Phiếu thu' : 'Phiếu chi';
   };
   
   return (
@@ -175,8 +174,8 @@ export default function CreatePaymentReceiptForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="receipt">Phiếu thu</SelectItem>
-                      <SelectItem value="payment">Phiếu chi</SelectItem>
+                      <SelectItem value="income">Phiếu thu</SelectItem>
+                      <SelectItem value="expense">Phiếu chi</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -187,7 +186,7 @@ export default function CreatePaymentReceiptForm({
             {/* Entity Type */}
             <FormField
               control={form.control}
-              name="entity"
+              name="entity_type"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Đối tượng</FormLabel>
@@ -299,6 +298,7 @@ export default function CreatePaymentReceiptForm({
                       <SelectItem value="cash">Tiền mặt</SelectItem>
                       <SelectItem value="bank_transfer">Chuyển khoản</SelectItem>
                       <SelectItem value="card">Thẻ tín dụng</SelectItem>
+                      <SelectItem value="other">Khác</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
