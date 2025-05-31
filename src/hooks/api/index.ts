@@ -7,17 +7,19 @@ export * from './use-suppliers';
 export * from './use-stock';
 export * from './use-inventory';
 
-// Export specific hooks from payment files to avoid conflicts
+// Export specific hooks from payment receipts to avoid conflicts
 export { 
-  useGetPaymentReceipt,
-  useCreatePaymentReceipt as useCreatePaymentReceiptDB,
+  useGetPaymentReceipts,
+  useCreatePaymentReceipt,
   useUpdatePaymentReceipt,
   useDeletePaymentReceipt 
 } from './use-payment-receipts';
 
+// Export specific hooks from payments to avoid conflicts with payment-receipts
 export { 
   useGetPaymentReceipts as useGetPaymentsAPI,
-  useCreatePaymentReceipt as useCreatePaymentAPI 
+  useCreatePaymentReceipt as useCreatePaymentAPI,
+  useGetPaymentReceipt
 } from './use-payments';
 
 // Export specific hooks from damaged stock to avoid conflicts  

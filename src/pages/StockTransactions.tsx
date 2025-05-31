@@ -15,20 +15,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export default function StockTransactions() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedType, setSelectedType] = useState("all");
-
-  // Get stock transactions data
-  const { data: transactions = [], isLoading, isError, refetch, error } = useGetStockTransactions();
-
-  // Filter transactions based on search term and selected type
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.transaction_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.reference_id?.toLowerCase().includes(searchTerm.toLowerCase());
+  const [typeFilter, setTypeFilter] = useState("all");
+  
+  const { data: stockData = [], isLoading, isError } = useGetStockTransactions();
+  
+  // Handle both array and paginated response format
+  const stockTransactions = Array.isArray(stockData) ? stockData : stockData.transactions || [];
+  
+  const filteredTransactions = stockTransactions.filter((transaction: StockTransaction) => {
+    const matchesSearch = transaction.transaction_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          transaction.product_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesType = selectedType === 'all' || transaction.type === selectedType;
-    
-    return matchesSearch && matchesType;
+    if (typeFilter === "all") return matchesSearch;
+    return transaction.type === typeFilter && matchesSearch;
   });
 
   return (
@@ -51,7 +50,7 @@ export default function StockTransactions() {
             />
           </div>
           <div className="flex gap-2">
-            <Select onValueChange={setSelectedType} defaultValue={selectedType}>
+            <Select onValueChange={setTypeFilter} defaultValue={typeFilter}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Chọn loại giao dịch" />
               </SelectTrigger>
