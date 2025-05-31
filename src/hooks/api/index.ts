@@ -15,6 +15,11 @@ export {
   useDeletePaymentReceipt 
 } from './use-payment-receipts';
 
+// Export with DB suffix for consistency with form usage
+export { 
+  useCreatePaymentReceipt as useCreatePaymentReceiptDB
+} from './use-payment-receipts';
+
 // Export specific hooks from payments to avoid conflicts with payment-receipts
 export { 
   useGetPaymentReceipts as useGetPaymentsAPI,
