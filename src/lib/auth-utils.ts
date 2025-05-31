@@ -1,15 +1,14 @@
-
 import { fetchWooCommerce, fetchWordPress } from './api';
 import { fetchCustomAPI } from './api/custom-api';
 
 export const DEFAULT_WOOCOMMERCE_CREDENTIALS = {
-  consumer_key: 'ck_7935a07888db15201ea09300934d277d69064c33',
-  consumer_secret: 'cs_27e30b01add28dcdf89ad3c12be21e096969c09d'
+  consumer_key: 'ck_3207eaecb8398cd88c08d9a99bdafc7c5d78f802',
+  consumer_secret: 'cs_ad924c003bd5202d44935fa589afc00d62deb00b'
 };
 
 export const DEFAULT_WORDPRESS_CREDENTIALS = {
   username: 'Sithethao',
-  application_password: 'LDUe HXkt Le1k ZmJT tkmL OVHs'
+  application_password: 'sygS HLvt ti2N vNlz ARmx 84MN'
 };
 
 /**
