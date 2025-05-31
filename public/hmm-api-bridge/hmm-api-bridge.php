@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Plugin Name: HMM API Bridge
@@ -287,16 +286,31 @@ class HMM_API_Bridge {
         
         $stats = array(
             'suppliers' => array(
-                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_suppliers") ?: 0
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_suppliers") ?: 0,
+                'active' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_suppliers WHERE status = 'active'") ?: 0
             ),
             'goods_receipts' => array(
-                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_goods_receipts") ?: 0
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_goods_receipts") ?: 0,
+                'pending' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_goods_receipts WHERE status = 'pending'") ?: 0,
+                'completed' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_goods_receipts WHERE status = 'completed'") ?: 0
             ),
             'returns' => array(
-                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_returns") ?: 0
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_returns") ?: 0,
+                'customer_returns' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_returns WHERE type = 'customer'") ?: 0,
+                'supplier_returns' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_returns WHERE type = 'supplier'") ?: 0
             ),
             'stock_transactions' => array(
-                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_stock_transactions") ?: 0
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_stock_transactions") ?: 0,
+                'this_month' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_stock_transactions WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())") ?: 0
+            ),
+            'payments' => array(
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_payment_receipts") ?: 0,
+                'income' => $wpdb->get_var("SELECT SUM(amount) FROM {$wpdb->prefix}hmm_payment_receipts WHERE type = 'income' AND status = 'completed'") ?: 0,
+                'expense' => $wpdb->get_var("SELECT SUM(amount) FROM {$wpdb->prefix}hmm_payment_receipts WHERE type = 'expense' AND status = 'completed'") ?: 0
+            ),
+            'damaged_stock' => array(
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_damaged_stock") ?: 0,
+                'this_month' => $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hmm_damaged_stock WHERE MONTH(date) = MONTH(CURRENT_DATE()) AND YEAR(date) = YEAR(CURRENT_DATE())") ?: 0
             )
         );
         
@@ -356,6 +370,10 @@ class HMM_API_Bridge {
             phone varchar(20) DEFAULT NULL,
             address text,
             contact_name varchar(100) DEFAULT NULL,
+            payment_terms varchar(50) DEFAULT 'cash',
+            tax_id varchar(50) DEFAULT NULL,
+            initial_debt decimal(15,2) DEFAULT 0.00,
+            current_debt decimal(15,2) DEFAULT 0.00,
             notes text,
             status varchar(20) DEFAULT 'active',
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -370,15 +388,20 @@ class HMM_API_Bridge {
             transaction_id varchar(32) NOT NULL,
             product_id bigint(20) NOT NULL,
             product_name varchar(255) NOT NULL,
+            variation_id bigint(20) DEFAULT NULL,
             quantity int(11) NOT NULL,
+            previous_quantity int(11) DEFAULT 0,
+            current_quantity int(11) DEFAULT 0,
             type varchar(50) NOT NULL,
             reference_id varchar(50) DEFAULT NULL,
+            reference_type varchar(50) DEFAULT NULL,
             notes text,
             created_by varchar(50) NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY product_id (product_id),
-            KEY type (type)
+            KEY type (type),
+            KEY transaction_id (transaction_id)
         ) $charset_collate;";
         
         // Goods receipts table
@@ -390,12 +413,37 @@ class HMM_API_Bridge {
             supplier_name varchar(255) NOT NULL,
             date datetime NOT NULL,
             total_amount decimal(15,2) NOT NULL DEFAULT 0.00,
+            payment_amount decimal(15,2) NOT NULL DEFAULT 0.00,
+            payment_method varchar(20) DEFAULT 'cash',
+            payment_status varchar(20) DEFAULT 'pending',
             status varchar(20) DEFAULT 'pending',
             notes text,
             created_by varchar(50) NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY receipt_id (receipt_id)
+            UNIQUE KEY receipt_id (receipt_id),
+            KEY supplier_id (supplier_id)
+        ) $charset_collate;";
+        
+        // Goods receipt items table
+        $table_goods_receipt_items = $wpdb->prefix . 'hmm_goods_receipt_items';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_goods_receipt_items (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            goods_receipt_id bigint(20) NOT NULL,
+            product_id bigint(20) NOT NULL,
+            product_name varchar(255) NOT NULL,
+            variation_id bigint(20) DEFAULT NULL,
+            sku varchar(100) DEFAULT NULL,
+            quantity int(11) NOT NULL,
+            unit_price decimal(15,2) NOT NULL,
+            total_price decimal(15,2) NOT NULL,
+            notes text,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY goods_receipt_id (goods_receipt_id),
+            KEY product_id (product_id),
+            FOREIGN KEY (goods_receipt_id) REFERENCES $table_goods_receipts(id) ON DELETE CASCADE
         ) $charset_collate;";
         
         // Returns table
@@ -409,12 +457,141 @@ class HMM_API_Bridge {
             date datetime NOT NULL,
             reason text NOT NULL,
             total_amount decimal(15,2) NOT NULL DEFAULT 0.00,
+            payment_amount decimal(15,2) NOT NULL DEFAULT 0.00,
+            payment_status varchar(20) DEFAULT 'not_refunded',
             status varchar(20) DEFAULT 'pending',
             notes text,
             created_by varchar(50) NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY return_id (return_id)
+            UNIQUE KEY return_id (return_id),
+            KEY entity_id (entity_id),
+            KEY type (type)
+        ) $charset_collate;";
+        
+        // Return items table
+        $table_return_items = $wpdb->prefix . 'hmm_return_items';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_return_items (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            return_id bigint(20) NOT NULL,
+            product_id bigint(20) NOT NULL,
+            product_name varchar(255) NOT NULL,
+            variation_id bigint(20) DEFAULT NULL,
+            sku varchar(100) DEFAULT NULL,
+            quantity int(11) NOT NULL,
+            unit_price decimal(15,2) NOT NULL,
+            total_price decimal(15,2) NOT NULL,
+            reason text,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY return_id (return_id),
+            KEY product_id (product_id),
+            FOREIGN KEY (return_id) REFERENCES $table_returns(id) ON DELETE CASCADE
+        ) $charset_collate;";
+        
+        // Payment receipts table
+        $table_payment_receipts = $wpdb->prefix . 'hmm_payment_receipts';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_payment_receipts (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            receipt_id varchar(32) NOT NULL,
+            type varchar(20) NOT NULL,
+            entity_type varchar(20) NOT NULL,
+            entity_id bigint(20) NOT NULL,
+            entity_name varchar(255) NOT NULL,
+            date datetime NOT NULL,
+            amount decimal(15,2) NOT NULL,
+            payment_method varchar(20) NOT NULL DEFAULT 'cash',
+            reference varchar(100) DEFAULT NULL,
+            reference_type varchar(20) DEFAULT NULL,
+            status varchar(20) DEFAULT 'completed',
+            description text NOT NULL,
+            notes text,
+            created_by varchar(50) NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY receipt_id (receipt_id),
+            KEY entity_id (entity_id),
+            KEY type (type),
+            KEY entity_type (entity_type)
+        ) $charset_collate;";
+        
+        // Payment attachments table
+        $table_payment_attachments = $wpdb->prefix . 'hmm_payment_attachments';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_payment_attachments (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            payment_receipt_id bigint(20) NOT NULL,
+            file_name varchar(255) NOT NULL,
+            file_url varchar(500) NOT NULL,
+            file_type varchar(50) NOT NULL,
+            file_size bigint(20) NOT NULL,
+            uploaded_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY payment_receipt_id (payment_receipt_id),
+            FOREIGN KEY (payment_receipt_id) REFERENCES $table_payment_receipts(id) ON DELETE CASCADE
+        ) $charset_collate;";
+        
+        // Stock adjustments table
+        $table_stock_adjustments = $wpdb->prefix . 'hmm_stock_adjustments';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_stock_adjustments (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            adjustment_id varchar(32) NOT NULL,
+            product_id bigint(20) NOT NULL,
+            product_name varchar(255) NOT NULL,
+            variation_id bigint(20) DEFAULT NULL,
+            old_quantity int(11) NOT NULL,
+            new_quantity int(11) NOT NULL,
+            adjustment_quantity int(11) NOT NULL,
+            adjustment_type varchar(20) NOT NULL,
+            reason text NOT NULL,
+            notes text,
+            created_by varchar(50) NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY adjustment_id (adjustment_id),
+            KEY product_id (product_id)
+        ) $charset_collate;";
+        
+        // Damaged stock table
+        $table_damaged_stock = $wpdb->prefix . 'hmm_damaged_stock';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_damaged_stock (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            damage_id varchar(32) NOT NULL,
+            product_id bigint(20) NOT NULL,
+            product_name varchar(255) NOT NULL,
+            variation_id bigint(20) DEFAULT NULL,
+            quantity int(11) NOT NULL,
+            reason text NOT NULL,
+            estimated_loss decimal(15,2) DEFAULT 0.00,
+            date datetime NOT NULL,
+            status varchar(20) DEFAULT 'reported',
+            notes text,
+            created_by varchar(50) NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY damage_id (damage_id),
+            KEY product_id (product_id)
+        ) $charset_collate;";
+        
+        // Customer debts table
+        $table_customer_debts = $wpdb->prefix . 'hmm_customer_debts';
+        $sql .= "CREATE TABLE IF NOT EXISTS $table_customer_debts (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            customer_id bigint(20) NOT NULL,
+            customer_name varchar(255) NOT NULL,
+            customer_email varchar(100) DEFAULT NULL,
+            initial_debt decimal(15,2) DEFAULT 0.00,
+            current_debt decimal(15,2) DEFAULT 0.00,
+            credit_limit decimal(15,2) DEFAULT 0.00,
+            payment_terms varchar(50) DEFAULT 'cash',
+            last_payment_date datetime DEFAULT NULL,
+            status varchar(20) DEFAULT 'active',
+            notes text,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY customer_id (customer_id)
         ) $charset_collate;";
         
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');

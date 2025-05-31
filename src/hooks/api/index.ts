@@ -7,3 +7,5 @@ export * from './use-suppliers';
 export * from './use-stock';
 export * from './use-payments';
 export * from './use-inventory';
+export * from './use-damaged-stock';
+export * from './use-payment-receipts';

@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Search, Plus, FileDown, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { useGetDamagedStock, useCreateDamagedStock } from "@/hooks/api-hooks";
 import { toast } from "sonner";
@@ -20,12 +19,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { getAllProducts } from "@/lib/woocommerce";
+import { exportToCSV } from "@/lib/api-utils";
 
 // Form schema for damaged stock report
 const damagedStockSchema = z.object({
   product_id: z.number().min(1, "Vui lòng chọn sản phẩm"),
   quantity: z.number().min(1, "Số lượng phải lớn hơn 0"),
   reason: z.string().min(3, "Vui lòng nhập lý do"),
+  estimated_loss: z.number().min(0, "Giá trị thiệt hại không được âm"),
   notes: z.string().optional(),
 });
 
@@ -37,7 +38,7 @@ export default function DamagedStock() {
   const [openDialog, setOpenDialog] = useState(false);
   
   // Get damaged stock data
-  const { data: damagedStockItems = [], isLoading, isError } = useGetDamagedStock();
+  const { data: damagedStockItems = [], isLoading, isError, refetch } = useGetDamagedStock();
   const createDamagedStock = useCreateDamagedStock();
 
   // Fetch products data
@@ -53,7 +54,8 @@ export default function DamagedStock() {
   // Filter damaged stock items based on search term
   const filteredItems = damagedStockItems.filter(item => 
     item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.reason?.toLowerCase().includes(searchTerm.toLowerCase())
+    item.reason?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.damage_id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
   // Setup form
@@ -63,6 +65,7 @@ export default function DamagedStock() {
       product_id: 0,
       quantity: 1,
       reason: "",
+      estimated_loss: 0,
       notes: "",
     }
   });
@@ -81,6 +84,7 @@ export default function DamagedStock() {
       product_name: selectedProduct.name,
       quantity: data.quantity,
       reason: data.reason,
+      estimated_loss: data.estimated_loss,
       notes: data.notes || "",
       date: new Date().toISOString()
     };
@@ -91,6 +95,29 @@ export default function DamagedStock() {
         form.reset();
       }
     });
+  };
+
+  const handleExportReport = () => {
+    if (filteredItems.length === 0) {
+      toast.error("Không có dữ liệu để xuất báo cáo");
+      return;
+    }
+    
+    // Format data for CSV export
+    const reportData = filteredItems.map(item => ({
+      'Mã báo cáo': item.damage_id,
+      'Ngày': formatDate(item.date),
+      'Sản phẩm': item.product_name,
+      'Số lượng': item.quantity,
+      'Lý do': item.reason,
+      'Thiệt hại ước tính': item.estimated_loss,
+      'Trạng thái': item.status === 'reported' ? 'Đã báo cáo' : 
+                   item.status === 'processed' ? 'Đã xử lý' : 'Đã xóa khỏi kho',
+      'Ghi chú': item.notes || ''
+    }));
+    
+    // Export to CSV
+    exportToCSV('bao-cao-hang-hong', reportData);
   };
   
   return (
@@ -113,7 +140,7 @@ export default function DamagedStock() {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExportReport}>
               <FileDown className="mr-2 h-4 w-4" />
               Xuất báo cáo
             </Button>
@@ -200,6 +227,25 @@ export default function DamagedStock() {
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name="estimated_loss"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Thiệt hại ước tính (VND)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0"
+                              {...field}
+                              onChange={(e) => field.onChange(Number(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     
                     <FormField
                       control={form.control}
@@ -236,9 +282,9 @@ export default function DamagedStock() {
             <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
             <h3 className="text-lg font-medium">Không thể tải dữ liệu</h3>
             <p className="text-muted-foreground mt-1 mb-4">
-              Đã xảy ra lỗi khi tải dữ liệu hàng hỏng từ API. Vui lòng kiểm tra kết nối đến plugin HMM Custom API.
+              Đã xảy ra lỗi khi tải dữ liệu hàng hỏng từ API. Vui lòng kiểm tra kết nối đến plugin HMM API Bridge.
             </p>
-            <Button variant="outline" onClick={() => navigate(0)}>
+            <Button variant="outline" onClick={() => refetch()}>
               Thử lại
             </Button>
           </div>
@@ -252,17 +298,24 @@ export default function DamagedStock() {
                   <TableHead>Sản phẩm</TableHead>
                   <TableHead>Số lượng</TableHead>
                   <TableHead>Lý do</TableHead>
+                  <TableHead>Thiệt hại ước tính</TableHead>
+                  <TableHead>Trạng thái</TableHead>
                   <TableHead>Ghi chú</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredItems.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium">DS-{item.id}</TableCell>
+                    <TableCell className="font-medium">{item.damage_id}</TableCell>
                     <TableCell>{formatDate(item.date)}</TableCell>
                     <TableCell>{item.product_name}</TableCell>
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>{item.reason}</TableCell>
+                    <TableCell>{item.estimated_loss?.toLocaleString('vi-VN')} VND</TableCell>
+                    <TableCell>
+                      {item.status === 'reported' ? 'Đã báo cáo' : 
+                       item.status === 'processed' ? 'Đã xử lý' : 'Đã xóa khỏi kho'}
+                    </TableCell>
                     <TableCell>{item.notes || "—"}</TableCell>
                   </TableRow>
                 ))}

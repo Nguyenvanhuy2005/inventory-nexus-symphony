@@ -20,6 +20,16 @@ export interface PaymentReceipt {
   updated_at: string;
 }
 
+export interface PaymentAttachment {
+  id: number;
+  payment_receipt_id: number;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  uploaded_at: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -73,15 +83,14 @@ export interface Supplier {
   phone?: string;
   address?: string;
   contact_name?: string;
-  notes?: string;
   payment_terms?: string;
   tax_id?: string;
+  initial_debt?: number;
+  current_debt?: number;
+  notes?: string;
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
-  initial_debt?: number;
-  current_debt?: number;
-  total_debt?: number;
 }
 
 export interface GoodsReceipt {
@@ -96,6 +105,7 @@ export interface GoodsReceipt {
   payment_status: 'pending' | 'partial' | 'paid';
   status: 'pending' | 'completed' | 'cancelled';
   notes?: string;
+  created_by: string;
   created_at?: string;
   updated_at?: string;
   items: GoodsReceiptItem[];
@@ -103,17 +113,16 @@ export interface GoodsReceipt {
 
 export interface GoodsReceiptItem {
   id?: number;
+  goods_receipt_id?: number;
   product_id: number;
   product_name: string;
   variation_id?: number;
   sku?: string;
   quantity: number;
   unit_price: number;
-  price?: number;
   total_price: number;
-  subtotal?: number;
   notes?: string;
-  name?: string;
+  created_at?: string;
 }
 
 export interface Return {
@@ -129,6 +138,7 @@ export interface Return {
   payment_status: 'refunded' | 'partial_refunded' | 'not_refunded';
   status: 'pending' | 'completed' | 'cancelled';
   notes?: string;
+  created_by: string;
   created_at?: string;
   updated_at?: string;
   items: ReturnItem[];
@@ -136,17 +146,16 @@ export interface Return {
 
 export interface ReturnItem {
   id?: number;
+  return_id?: number;
   product_id: number;
-  product_name?: string;
+  product_name: string;
   variation_id?: number;
   sku?: string;
   quantity: number;
   unit_price: number;
-  price?: number;
   total_price: number;
-  subtotal?: number;
   reason?: string;
-  name?: string;
+  created_at?: string;
 }
 
 export interface StockTransaction {
@@ -159,10 +168,57 @@ export interface StockTransaction {
   previous_quantity: number;
   current_quantity: number;
   type: 'goods_receipt' | 'return' | 'sale' | 'adjustment' | 'damaged';
-  transaction_type?: string;
   reference_id: string;
   reference_type: 'goods_receipt' | 'return' | 'order' | 'adjustment' | 'damaged';
   notes?: string;
   created_by: string;
   created_at: string;
+}
+
+export interface StockAdjustment {
+  id: number;
+  adjustment_id: string;
+  product_id: number;
+  product_name: string;
+  variation_id?: number;
+  old_quantity: number;
+  new_quantity: number;
+  adjustment_quantity: number;
+  adjustment_type: 'increase' | 'decrease';
+  reason: string;
+  notes?: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface DamagedStock {
+  id: number;
+  damage_id: string;
+  product_id: number;
+  product_name: string;
+  variation_id?: number;
+  quantity: number;
+  reason: string;
+  estimated_loss: number;
+  date: string;
+  status: 'reported' | 'processed' | 'written_off';
+  notes?: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CustomerDebt {
+  id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_email?: string;
+  initial_debt: number;
+  current_debt: number;
+  credit_limit: number;
+  payment_terms: string;
+  last_payment_date?: string;
+  status: 'active' | 'inactive' | 'blocked';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
