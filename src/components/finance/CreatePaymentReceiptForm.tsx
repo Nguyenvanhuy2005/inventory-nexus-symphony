@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -25,7 +24,7 @@ import {
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { CalendarIcon, PaperclipIcon } from 'lucide-react';
-import { useCreatePaymentReceipt } from '@/hooks/api-hooks';
+import { useCreatePaymentReceiptDB } from '@/hooks/api-hooks';
 import { uploadAttachment } from '@/lib/api-utils';
 
 // Form validation schema
@@ -99,7 +98,7 @@ export default function CreatePaymentReceiptForm({
   });
   
   // Create payment receipt mutation
-  const { mutate: createPaymentReceipt, isPending } = useCreatePaymentReceipt();
+  const { mutate: createPaymentReceipt, isPending } = useCreatePaymentReceiptDB();
   
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,7 +132,9 @@ export default function CreatePaymentReceiptForm({
       type: data.type,
       description: data.description || '',
       notes: data.notes || '',
-      attachment_url: data.attachment_url,
+      attachment_url: data.attachment_url || '',
+      status: 'completed',
+      created_by: 'Admin', // TODO: Get from auth context
     }, {
       onSuccess: () => {
         form.reset();
